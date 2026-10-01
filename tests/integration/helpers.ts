@@ -1,9 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { getDb, openDatabase, useDatabase } from "@/lib/db/connection";
+import { getStore, openDatabase, type Row, type TableName, useDatabase } from "@/lib/db/connection";
 import { getCompany } from "@/lib/db/repository";
-import { runPipeline, type PipelineCounts } from "@/lib/server/pipeline";
+import { runPipeline, type PipelineCounts } from "@/lib/crm/pipeline";
 import type { Company } from "@/lib/triage/types";
 
 const DEMO = path.resolve(process.cwd(), "demo");
@@ -17,7 +17,7 @@ export function demoTexts(): [string, string] {
 
 /** A fresh, empty CRM for one test. */
 export function freshDatabase(): void {
-  useDatabase(openDatabase(":memory:"));
+  useDatabase(openDatabase());
 }
 
 /** A fresh CRM loaded from the generated demo files. */
@@ -26,8 +26,9 @@ export function loadDemo(): PipelineCounts {
   return runPipeline(...demoTexts());
 }
 
-export function count(sql: string, ...params: unknown[]): number {
-  return (getDb().prepare(sql).get(...params) as { n: number }).n;
+/** Rows in ``table`` (matching ``where``, if given). */
+export function count(table: TableName, where: (row: Row) => boolean = () => true): number {
+  return getStore()[table].filter(where).length;
 }
 
 export function getCompanyOrThrow(id: number): Company {
@@ -37,8 +38,6 @@ export function getCompanyOrThrow(id: number): Company {
 }
 
 export function robotix(): Company {
-  const row = getDb().prepare("SELECT id FROM company WHERE website_domain = 'robotix.example'").get() as {
-    id: number;
-  };
-  return getCompanyOrThrow(row.id);
+  const row = getStore().company.find((company) => company.website_domain === "robotix.example")!;
+  return getCompanyOrThrow(Number(row.id));
 }

@@ -1,10 +1,17 @@
 "use client";
 
+import { Download } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toCsv } from "@/lib/triage/csv";
+import { cn } from "@/lib/utils";
 
+import { Caption, DataTable, NUM } from "./page";
 import { IntroReplyButton, PassButton, type IntroDialogData, type PassDialogData } from "./ReplyDialogs";
 
 export type PillAction =
@@ -14,25 +21,26 @@ export type PillAction =
 
 /** The next-action pill in "My view": it does the next step right there. */
 export function NextActionPill({ label, hot, action }: { label: string; hot: boolean; action: PillAction }) {
-  const className = hot ? "pill hot" : "pill";
+  // Red marks what is urgent; ink is everything else. The words say which step it is.
+  const look = { variant: hot ? "default" : "secondary", size: "sm", className: cn("rounded-full px-3.5 font-semibold", !hot && "hover:bg-secondary/85") } as const;
   if (action.kind === "intro") {
     return (
-      <IntroReplyButton data={action.data} className={className}>
+      <IntroReplyButton data={action.data} {...look}>
         {label}
       </IntroReplyButton>
     );
   }
   if (action.kind === "pass_draft") {
     return (
-      <PassButton data={action.data} className={className}>
+      <PassButton data={action.data} {...look}>
         {label}
       </PassButton>
     );
   }
   return (
-    <Link href={action.href} className={className}>
-      {label}
-    </Link>
+    <Button {...look} asChild>
+      <Link href={action.href}>{label}</Link>
+    </Button>
   );
 }
 
@@ -49,17 +57,23 @@ export function NavigateSelect({
   hrefFor: Record<string, string>;
 }) {
   const router = useRouter();
+  const id = `navigate-${label.replaceAll(" ", "-").toLowerCase()}`;
   return (
-    <label className="field inline no-print">
-      <span>{label}</span>
-      <select value={value} onChange={(event) => router.push(hrefFor[event.target.value])}>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div className="my-2.5 grid max-w-80 gap-1.5 print:hidden">
+      <Label htmlFor={id}>{label}</Label>
+      <Select value={value} onValueChange={(next) => router.push(hrefFor[next])}>
+        <SelectTrigger id={id} className="w-full bg-card">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option} value={option}>
+              {option}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }
 
@@ -108,41 +122,43 @@ export function ExportControls({ fileName, rows }: { fileName: string; rows: Exp
   }
   const printColumns = EXPORT_COLUMNS.filter((column) => column !== "Website");
   return (
-    <div className="export">
-      <div className="button-row no-print">
-        <button type="button" className="button" onClick={download} disabled={!rows.length}>
-          ⬇ Export to CSV
-        </button>
+    <div className="mt-4">
+      <div className="my-2.5 print:hidden">
+        <Button variant="outline" size="lg" onClick={download} disabled={!rows.length}>
+          <Download aria-hidden="true" /> Export to CSV
+        </Button>
       </div>
-      <details className="expander print-view">
-        <summary>Print view for the Monday meeting</summary>
-        <div className="expander-body">
-          <p className="caption no-print">Print with Ctrl+P.</p>
+      {/* A native <details>, so the print stylesheet can open it for the Monday meeting. */}
+      <details className="print-view group my-2 rounded-lg border bg-card">
+        <summary className="cursor-pointer px-3.5 py-2.5 font-medium">Print view for the Monday meeting</summary>
+        <div className="px-3.5 pb-3.5">
+          <Caption className="print:hidden">Print with Ctrl+P.</Caption>
           {rows.length ? (
-            <div className="table-wrap">
-              <table className="data">
-                <thead>
-                  <tr>
-                    {printColumns.map((column) => (
-                      <th key={column} className={typeof rows[0][column] === "number" ? "num" : undefined}>
-                        {column}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.Rank}>
-                      {printColumns.map((column) => (
-                        <td key={column} className={typeof row[column] === "number" ? "num" : undefined}>
-                          {row[column]}
-                        </td>
-                      ))}
-                    </tr>
+            <DataTable>
+              <TableHeader>
+                <TableRow>
+                  {printColumns.map((column) => (
+                    <TableHead key={column} className={cn(typeof rows[0][column] === "number" && NUM)}>
+                      {column}
+                    </TableHead>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((row) => (
+                  <TableRow key={row.Rank}>
+                    {printColumns.map((column) => (
+                      <TableCell
+                        key={column}
+                        className={cn("whitespace-normal align-top", typeof row[column] === "number" && NUM)}
+                      >
+                        {row[column]}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </DataTable>
           ) : null}
         </div>
       </details>

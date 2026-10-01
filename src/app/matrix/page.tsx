@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * The priority matrix: every open, filter-passing deal on score % × urgency.
  *
@@ -9,25 +11,27 @@ import Link from "next/link";
 
 import { NavigateSelect } from "@/components/CockpitClient";
 import { RememberDealList } from "@/components/dealList";
-import { COLD, MatrixChart, WARM } from "@/components/MatrixChart";
+import { Caption, DataTable, Display, Eyebrow, Lede, Notice, NUM } from "@/components/page";
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { MatrixChart } from "@/components/MatrixChart";
+import { useCrm, useSearchRecord } from "@/components/useCrm";
 import { dealHref, withQuery } from "@/lib/routes";
-import { cockpitLines } from "@/lib/server/views";
+import { cockpitLines } from "@/lib/crm/views";
 import { byPriority, byPriorityThenScore, matrixRows, QUADRANT_ORDER } from "@/lib/triage/cockpit";
 import { demoToday, loadTriageConfig, teamNames } from "@/lib/triage/config";
 import { QUADRANTS, rankByPriority, type QuadrantKey } from "@/lib/triage/urgency";
 
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
-
-function one(value: string | string[] | undefined): string {
-  return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
+function one(value: string | undefined): string {
+  return value ?? "";
 }
 
 const WHOLE_TEAM = "Whole team";
 // Tiles laid out like the chart: urgent on top, higher score on the right.
 const TILE_LAYOUT: QuadrantKey[] = ["reply_fast", "act_now", "park", "plan"];
 
-export default async function MatrixPage({ searchParams }: { searchParams: SearchParams }) {
-  const params = await searchParams;
+export default function MatrixPage() {
+  useCrm();
+  const params = useSearchRecord();
   const team = teamNames();
   const owner = team.includes(one(params.owner)) ? one(params.owner) : WHOLE_TEAM;
   const selected = (QUADRANT_ORDER as string[]).includes(one(params.q)) ? (one(params.q) as QuadrantKey) : null;
@@ -42,12 +46,12 @@ export default async function MatrixPage({ searchParams }: { searchParams: Searc
 
   return (
     <>
-      <div className="eyebrow">Score × urgency</div>
-      <h1 className="display large">Priority matrix</h1>
-      <p className="lede">
+      <Eyebrow>Score × urgency</Eyebrow>
+      <Display>Priority matrix</Display>
+      <Lede>
         Every open deal that passed the hard filters, placed by fit and urgency. Time in queue is not part of either
         axis.
-      </p>
+      </Lede>
       <NavigateSelect
         label="Deals owned by"
         value={owner}
@@ -57,7 +61,7 @@ export default async function MatrixPage({ searchParams }: { searchParams: Searc
         )}
       />
       {!rows.length ? (
-        <div className="alert alert-info">No open deals for this owner.</div>
+        <Notice tone="info">No open deals for this owner.</Notice>
       ) : (
         <MatrixBody rows={rows} lines={lines} selected={selected} ownerParam={ownerParam} currentHref={currentHref} />
       )}
@@ -85,22 +89,26 @@ function MatrixBody({
     .map((line) => line.company.id);
   return (
     <>
-      <div className="quads">
+      <div className="my-3.5 grid gap-3 md:grid-cols-2">
         {TILE_LAYOUT.map((key) => {
           const [name, help] = QUADRANTS[key];
           const count = rows.filter((row) => row.quadrant_key === key).length;
           return (
             <Link
               key={key}
-              className="quad"
+              className="group/quad flex min-h-23 items-start gap-3 rounded-lg border bg-card px-3.5 py-3 no-underline transition-colors hover:border-foreground aria-[current=true]:border-foreground aria-[current=true]:bg-foreground"
               href={withQuery("/matrix", { owner: ownerParam, q: selected === key ? null : key })}
               aria-current={selected === key ? "true" : undefined}
               aria-label={`Show ${name} (${count})`}
             >
-              <span className="quad-count">{count}</span>
+              <span className="min-w-11 font-display text-[38px] leading-none text-primary group-aria-[current=true]/quad:text-[#ff6b81]">
+                {count}
+              </span>
               <span>
-                <span className="quad-name">{name}</span>
-                <span className="quad-help" style={{ display: "block" }}>
+                <span className="block font-bold text-foreground group-aria-[current=true]/quad:text-background">
+                  {name}
+                </span>
+                <span className="mt-0.5 block text-[13.5px] leading-snug text-muted-foreground group-aria-[current=true]/quad:text-background">
                   {help}
                 </span>
               </span>
@@ -109,12 +117,12 @@ function MatrixBody({
         })}
       </div>
 
-      <div className="legend">
+      <div className="mt-1 mb-2 flex flex-wrap gap-4.5 text-sm text-foreground/90">
         <span>
-          <span style={{ color: WARM }}>▲</span> Warm intro
+          <span className="text-warm">▲</span> Warm intro
         </span>
         <span>
-          <span style={{ color: COLD }}>●</span> Cold inbound
+          <span className="text-cold">●</span> Cold inbound
         </span>
         <span>Bubble size = touchpoints</span>
         <span>Dashed lines = quadrant splits</span>
@@ -127,47 +135,48 @@ function MatrixBody({
         dealHrefs={Object.fromEntries(rows.map((row) => [row.company_id, dealHref(row.company_id, currentHref)]))}
         priorityOrder={byPriority(rows).map((row) => row.company_id)}
       />
-      <p className="caption">
+      <Caption>
         Points on the same value are spread slightly so none hide behind another; the tooltip shows the exact score and
         urgency. The six highest-priority deals are labelled.
-      </p>
+      </Caption>
 
       <RememberDealList title={`Matrix: ${title}`} ids={shown.map((row) => row.company_id)} />
       <p>
         <strong>{title}</strong> · {shown.length} deals · highest priority first
       </p>
-      <div className="table-wrap">
-        <table className="data">
-          <thead>
-            <tr>
-              <th>Company</th>
-              <th className="num">Score</th>
-              <th className="num">Urgency</th>
-              <th className="num">Touch­points</th>
-              <th>Source</th>
-              <th>Next action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown.slice(0, 30).map((row) => (
-              <tr key={row.company_id}>
-                <td>
-                  <Link className="link-button" href={dealHref(row.company_id, currentHref)}>
-                    {row.Company}
-                  </Link>
-                </td>
-                <td className="num">{row["Score %"]}</td>
-                <td className="num">{row.Urgency}</td>
-                <td className="num">{row.Touchpoints}</td>
-                <td>{row.Source}</td>
-                <td>{row["Next action"]}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Company</TableHead>
+            <TableHead className={NUM}>Score</TableHead>
+            <TableHead className={NUM}>Urgency</TableHead>
+            <TableHead className={NUM}>Touch­points</TableHead>
+            <TableHead>Source</TableHead>
+            <TableHead>Next action</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {shown.slice(0, 30).map((row) => (
+            <TableRow key={row.company_id}>
+              <TableCell>
+                <Link
+                  className="font-bold text-foreground no-underline hover:text-primary hover:underline"
+                  href={dealHref(row.company_id, currentHref)}
+                >
+                  {row.Company}
+                </Link>
+              </TableCell>
+              <TableCell className={NUM}>{row["Score %"]}</TableCell>
+              <TableCell className={NUM}>{row.Urgency}</TableCell>
+              <TableCell className={NUM}>{row.Touchpoints}</TableCell>
+              <TableCell>{row.Source}</TableCell>
+              <TableCell>{row["Next action"]}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </DataTable>
       {shown.length > 30 ? (
-        <p className="caption">Showing the first 30 of {shown.length}. Pick a quadrant above to narrow the list.</p>
+        <Caption>Showing the first 30 of {shown.length}. Pick a quadrant above to narrow the list.</Caption>
       ) : null}
     </>
   );

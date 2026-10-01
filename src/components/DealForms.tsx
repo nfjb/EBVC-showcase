@@ -2,13 +2,20 @@
 
 /** The forms on Deal detail: ratings, the decision, messages, and the rank override. */
 
-import { useState } from "react";
+import { Ban, Mail, Pin } from "lucide-react";
+import { useId, useState } from "react";
 
-import { overrideRankAction, saveRatingsAction } from "@/app/actions";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { overrideRankAction, saveRatingsAction } from "@/lib/crm/actions";
 
+import { Caption } from "./page";
 import {
   AdvanceForm,
   ErrorLine,
+  Field,
   IntroducerThanksButton,
   IntroReplyButton,
   PassButton,
@@ -27,22 +34,31 @@ function Segmented({
   value: number | null;
   onChange: (value: number | null) => void;
 }) {
+  const id = useId();
   return (
-    <fieldset className="rating">
-      <legend>{legend}</legend>
-      <div className="segmented">
+    <div className="my-3" role="group" aria-labelledby={id}>
+      <div id={id} className="mb-1.5 text-sm font-medium">
+        {legend}
+      </div>
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        spacing={1.5}
+        value={value === null ? "" : String(value)}
+        onValueChange={(next) => onChange(next ? Number(next) : null)}
+      >
         {[1, 2, 3].map((option) => (
-          <button
+          <ToggleGroupItem
             key={option}
-            type="button"
-            aria-pressed={value === option}
-            onClick={() => onChange(value === option ? null : option)}
+            value={String(option)}
+            aria-label={`${legend}: ${option}`}
+            className="h-9 min-w-11 rounded-full bg-card font-semibold data-[state=on]:border-foreground data-[state=on]:bg-foreground data-[state=on]:text-background"
           >
             {option}
-          </button>
+          </ToggleGroupItem>
         ))}
-      </div>
-    </fieldset>
+      </ToggleGroup>
+    </div>
   );
 }
 
@@ -81,9 +97,9 @@ function RatingsForm({ data }: { data: DecideData }) {
       <Segmented legend={`Thesis fit${suggested}`} value={thesisFit} onChange={setThesisFit} />
       <Segmented legend="Market" value={market} onChange={setMarket} />
       <Segmented legend="Team" value={team} onChange={setTeam} />
-      <button type="submit" className="button" disabled={pending}>
+      <Button type="submit" variant="outline" size="lg" disabled={pending}>
         Save ratings
-      </button>
+      </Button>
       <ErrorLine error={error} />
     </form>
   );
@@ -91,7 +107,7 @@ function RatingsForm({ data }: { data: DecideData }) {
 
 export function DecideSection({ data }: { data: DecideData }) {
   return (
-    <div className="grid-3-2">
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       {/* A fresh form whenever the stored ratings change (after a save). */}
       <RatingsForm key={`${data.thesisFit}-${data.thesisFitConfirmed}-${data.market}-${data.team}`} data={data} />
       <div>
@@ -102,28 +118,30 @@ export function DecideSection({ data }: { data: DecideData }) {
         <AdvanceForm
           companyId={data.companyId}
           passButton={
-            <PassButton data={data.pass} className="button">
-              ⛔ Pass…
+            <PassButton data={data.pass} size="lg">
+              <Ban aria-hidden="true" /> Pass…
             </PassButton>
           }
         />
 
-        <p>
+        <p className="mt-4">
           <strong>Messages</strong>
         </p>
-        <div className="button-row" style={{ flexDirection: "column" }}>
+        <div className="my-2.5 flex flex-col gap-2.5">
           {data.introReply ? (
-            <IntroReplyButton data={data.introReply} className="button wide">
-              ✉️ Reply to the founder
+            <IntroReplyButton data={data.introReply} size="lg" className="w-full">
+              <Mail aria-hidden="true" /> Reply to the founder
             </IntroReplyButton>
           ) : null}
-          {data.introducerThanks ? <IntroducerThanksButton data={data.introducerThanks} className="button wide" /> : null}
+          {data.introducerThanks ? (
+            <IntroducerThanksButton data={data.introducerThanks} size="lg" className="w-full" />
+          ) : null}
         </div>
-        <p className="caption">
+        <Caption>
           {data.sentCount
             ? `${data.sentCount} message${data.sentCount !== 1 ? "s" : ""} sent from the app (simulated).`
             : "No messages sent yet."}
-        </p>
+        </Caption>
       </div>
     </div>
   );
@@ -134,26 +152,29 @@ export function RankOverrideForm({ companyId, current }: { companyId: number; cu
   const [reason, setReason] = useState("");
   const { run, pending, error } = useAction();
   return (
-    <form
-      className="card"
-      onSubmit={(event) => {
-        event.preventDefault();
-        const pinned = Math.trunc(Number(rank) || 0);
-        run(() => overrideRankAction(companyId, pinned > 0 ? pinned : null, reason));
-      }}
-    >
-      <label className="field inline">
-        <span>Pin to rank (0 removes the pin)</span>
-        <input type="number" min={0} step={1} value={rank} onChange={(event) => setRank(event.target.value)} />
-      </label>
-      <label className="field">
-        <span>Why? (required, logged)</span>
-        <input type="text" value={reason} onChange={(event) => setReason(event.target.value)} />
-      </label>
-      <button type="submit" className="button" disabled={pending}>
-        📌 Save override
-      </button>
-      <ErrorLine error={error} />
-    </form>
+    <Card className="max-w-2xl">
+      <CardContent>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            const pinned = Math.trunc(Number(rank) || 0);
+            run(() => overrideRankAction(companyId, pinned > 0 ? pinned : null, reason));
+          }}
+        >
+          <Field label="Pin to rank (0 removes the pin)" className="my-2.5 grid max-w-80 gap-1.5">
+            {(id) => (
+              <Input id={id} type="number" min={0} step={1} value={rank} onChange={(event) => setRank(event.target.value)} />
+            )}
+          </Field>
+          <Field label="Why? (required, logged)">
+            {(id) => <Input id={id} value={reason} onChange={(event) => setReason(event.target.value)} />}
+          </Field>
+          <Button type="submit" variant="outline" size="lg" disabled={pending}>
+            <Pin aria-hidden="true" /> Save override
+          </Button>
+          <ErrorLine error={error} />
+        </form>
+      </CardContent>
+    </Card>
   );
 }

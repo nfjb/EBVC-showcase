@@ -7,9 +7,8 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { getDb } from "@/lib/db/connection";
 import * as repo from "@/lib/db/repository";
-import { runPipeline, type PipelineCounts } from "@/lib/server/pipeline";
+import { runPipeline, type PipelineCounts } from "@/lib/crm/pipeline";
 import {
   advance,
   approveMerge,
@@ -19,7 +18,7 @@ import {
   rejectMerge,
   saveRatings,
   setIntroStatus,
-} from "@/lib/server/triageActions";
+} from "@/lib/crm/triageActions";
 import { ActionRefused } from "@/lib/triage/errors";
 import { OUTSIDE_GEOGRAPHY, OUTSIDE_STAGE, TICKET_MISMATCH } from "@/lib/triage/filters";
 
@@ -35,8 +34,8 @@ beforeEach(() => {
 describe("pipeline", () => {
   it("keeps every raw record as a touchpoint", () => {
     expect(counts.raw_records).toBe(412);
-    expect(count("SELECT COUNT(*) AS n FROM touchpoint")).toBe(412);
-    expect(count("SELECT COUNT(*) AS n FROM touchpoint WHERE channel = 'warm_intro'")).toBe(25);
+    expect(count("touchpoint")).toBe(412);
+    expect(count("touchpoint", (row) => row.channel === "warm_intro")).toBe(25);
   });
 
   it("makes the Robotix showcase one company with its full history", () => {
@@ -66,10 +65,10 @@ describe("pipeline", () => {
   });
 
   it("never rates team or market and writes no decisions", () => {
-    expect(count("SELECT COUNT(*) AS n FROM company WHERE team IS NOT NULL")).toBe(0);
-    expect(count("SELECT COUNT(*) AS n FROM company WHERE market IS NOT NULL")).toBe(0);
-    expect(count("SELECT COUNT(*) AS n FROM company WHERE thesis_fit_confirmed = 1")).toBe(0);
-    expect(count("SELECT COUNT(*) AS n FROM decision")).toBe(0);
+    expect(count("company", (row) => row.team !== null)).toBe(0);
+    expect(count("company", (row) => row.market !== null)).toBe(0);
+    expect(count("company", (row) => Boolean(row.thesis_fit_confirmed))).toBe(0);
+    expect(count("decision")).toBe(0);
   });
 
   it("leaves suggested merges waiting for a person", () => {
@@ -97,14 +96,14 @@ describe("human actions", () => {
     const suggestion = repo.listMergeSuggestions()[0];
     rejectMerge(suggestion.id, PERSON);
     expect(repo.getCompany(suggestion.candidate_id)).not.toBeNull();
-    expect(count("SELECT COUNT(*) AS n FROM decision WHERE decision = 'merge_rejected'")).toBe(1);
+    expect(count("decision", (row) => row.decision === "merge_rejected")).toBe(1);
   });
 
   it("refuses to decide the same merge twice", () => {
     const suggestion = repo.listMergeSuggestions()[0];
     rejectMerge(suggestion.id, PERSON);
     expect(() => approveMerge(suggestion.id, PERSON)).toThrow(ActionRefused);
-    expect(count("SELECT COUNT(*) AS n FROM decision")).toBe(1);
+    expect(count("decision")).toBe(1);
   });
 
   it("logs advance and pass with who and pass code", () => {
@@ -126,7 +125,7 @@ describe("human actions", () => {
     overrideRank(robotix().id, 1, "Partner meeting asked to see it first", PERSON);
     const ranked = rankWorklist(repo.listCompaniesWithTouchpoints());
     expect(ranked[0].id).toBe(robotix().id);
-    expect(count("SELECT COUNT(*) AS n FROM decision WHERE decision = 'rank_override'")).toBe(1);
+    expect(count("decision", (row) => row.decision === "rank_override")).toBe(1);
   });
 
   it("rescores and logs human ratings", () => {
@@ -136,7 +135,7 @@ describe("human actions", () => {
     expect(company.score).toBeGreaterThan(before);
     expect(company.thesis_fit_confirmed).toBe(true);
     expect(company.team).toBe(2);
-    expect(count("SELECT COUNT(*) AS n FROM decision WHERE decision = 'rating_changed'")).toBe(1);
+    expect(count("decision", (row) => row.decision === "rating_changed")).toBe(1);
   });
 
   it("saves nothing when the decision cannot be logged", () => {
@@ -149,7 +148,7 @@ describe("human actions", () => {
     const intro = repo.touchpointsOf(robotix().id).find((touchpoint) => touchpoint.channel === "warm_intro")!;
     setIntroStatus(intro.id, "replied", PERSON);
     expect(repo.getTouchpoint(intro.id)!.intro_status).toBe("replied");
-    expect(count("SELECT COUNT(*) AS n FROM decision WHERE decision = 'intro_replied'")).toBe(1);
+    expect(count("decision", (row) => row.decision === "intro_replied")).toBe(1);
   });
 
   it("keeps the audit log through a re-upload", () => {
@@ -164,6 +163,6 @@ describe("human actions", () => {
     const before = repo.countCompanies();
     expect(() => runPipeline("not,a,deal,flow\n1,2,3,4\n", demoTexts()[1])).toThrow(/missing column/);
     expect(repo.countCompanies()).toBe(before);
-    expect(getDb().prepare("SELECT COUNT(*) AS n FROM touchpoint").get()).toEqual({ n: 412 });
+    expect(count("touchpoint")).toBe(412);
   });
 });

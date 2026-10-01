@@ -3,8 +3,8 @@
  * the signals CSV, and record the run.
  */
 
-import fs from "node:fs";
-import path from "node:path";
+import inboundDemo from "../../../demo/inbound_records.csv?raw";
+import signalsDemo from "../../../demo/signals.csv?raw";
 
 import { atomic } from "@/lib/db/connection";
 import * as repo from "@/lib/db/repository";
@@ -50,21 +50,7 @@ export function runPipeline(inboundText: string, signalsText: string): PipelineC
     };
   });
 
-  console.info("Deal-flow pipeline run");
-  console.table(Object.entries(counts).map(([Stage, Count]) => ({ Stage, Count })));
   return counts;
-}
-
-export function uploadsDirectory(): string {
-  return process.env.UPLOADS_DIR ?? path.join(process.cwd(), "dealflow_uploads");
-}
-
-function storeFile(fileName: string, contents: string, stamp: string): string {
-  const safeName = path.basename(fileName).replace(/[^\w.-]+/g, "_") || "upload.csv";
-  const stored = path.join(uploadsDirectory(), `${stamp}-${safeName}`);
-  fs.mkdirSync(path.dirname(stored), { recursive: true });
-  fs.writeFileSync(stored, contents, "utf-8");
-  return path.relative(process.cwd(), stored);
 }
 
 export interface UploadInput {
@@ -75,20 +61,19 @@ export interface UploadInput {
 
 export type UploadResult = { ok: true; id: number; counts: PipelineCounts } | { ok: false; id: number | null; error: string };
 
-/** A deal-flow upload: keep both files, run the pipeline, record the counts (or the error). */
+/**
+ * A deal-flow upload: run the pipeline and record the counts (or the error). Only the file
+ * names are kept; the CRM lives in this browser tab, so nothing is written anywhere.
+ */
 export function createUpload({ inbound, signals, uploadedBy }: UploadInput): UploadResult {
   if (!inbound || !signals) {
     return { ok: false, id: null, error: "Upload both the inbound CSV and the signals CSV." };
   }
-  const createdAt = new Date().toISOString();
-  const stamp = createdAt.replace(/[:.]/g, "-");
-  const inboundFile = storeFile(inbound.name, inbound.text, stamp);
-  const signalsFile = storeFile(signals.name, signals.text, stamp);
   const record = {
-    inbound_file: inboundFile,
-    signals_file: signalsFile,
+    inbound_file: inbound.name,
+    signals_file: signals.name,
     uploaded_by: uploadedBy,
-    created_at: createdAt,
+    created_at: new Date().toISOString(),
   };
   try {
     const counts = runPipeline(inbound.text, signals.text);
@@ -119,9 +104,20 @@ export function createUpload({ inbound, signals, uploadedBy }: UploadInput): Upl
 
 /** The bundled demo files (``demo/inbound_records.csv`` and ``demo/signals.csv``). */
 export function demoFiles(): { inbound: { name: string; text: string }; signals: { name: string; text: string } } {
-  const demo = path.join(process.cwd(), "demo");
   return {
-    inbound: { name: "inbound_records.csv", text: fs.readFileSync(path.join(demo, "inbound_records.csv"), "utf-8") },
-    signals: { name: "signals.csv", text: fs.readFileSync(path.join(demo, "signals.csv"), "utf-8") },
+    inbound: { name: "inbound_records.csv", text: inboundDemo },
+    signals: { name: "signals.csv", text: signalsDemo },
   };
+}
+
+/** Who the automatic demo load is logged under on Deal flow uploads. */
+export const DEMO_LOADER = "Demo data (loaded when the app opened)";
+
+/**
+ * Load the bundled demo files into an empty CRM, once per tab, so the app opens with deals
+ * to triage. A bulk load like any upload: it writes no Decision rows.
+ */
+export function loadDemoIfEmpty(): void {
+  if (repo.countCompanies() || repo.listUploads().length) return;
+  createUpload({ ...demoFiles(), uploadedBy: DEMO_LOADER });
 }

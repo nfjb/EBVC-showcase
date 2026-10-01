@@ -1,45 +1,30 @@
 "use client";
 
-import { Children, useId, useState, type ReactNode } from "react";
+import { Children, type ReactNode } from "react";
 
-/** Tabs over server-rendered panels (one child per label). */
+import { Tabs as TabsRoot, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+/** Tabs over panels (one child per label). */
 export function Tabs({ labels, children }: { labels: string[]; children: ReactNode }) {
-  const [active, setActive] = useState(0);
-  const id = useId();
   const panels = Children.toArray(children);
   return (
-    <div className="tabs">
-      <div role="tablist">
+    <TabsRoot defaultValue="0" className="mt-5">
+      <TabsList variant="line" className="h-auto w-full justify-start border-b pb-1">
         {labels.map((label, index) => (
-          <button
+          <TabsTrigger
             key={label}
-            type="button"
-            role="tab"
-            id={`${id}-tab-${index}`}
-            aria-selected={active === index}
-            aria-controls={`${id}-panel-${index}`}
-            tabIndex={active === index ? 0 : -1}
-            onClick={() => setActive(index)}
-            onKeyDown={(event) => {
-              if (event.key === "ArrowRight") setActive((active + 1) % labels.length);
-              if (event.key === "ArrowLeft") setActive((active - 1 + labels.length) % labels.length);
-            }}
+            value={String(index)}
+            className="flex-none px-3 py-1.5 text-[15px] font-semibold group-data-[variant=line]/tabs-list:data-active:after:bg-primary"
           >
             {label}
-          </button>
+          </TabsTrigger>
         ))}
-      </div>
+      </TabsList>
       {panels.map((panel, index) => (
-        <div
-          key={index}
-          role="tabpanel"
-          id={`${id}-panel-${index}`}
-          aria-labelledby={`${id}-tab-${index}`}
-          hidden={active !== index}
-        >
+        <TabsContent key={index} value={String(index)} className="pt-3 text-base">
           {panel}
-        </div>
+        </TabsContent>
       ))}
-    </div>
+    </TabsRoot>
   );
 }

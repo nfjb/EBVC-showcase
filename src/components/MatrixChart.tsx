@@ -15,8 +15,8 @@ import type { MatrixRow } from "@/lib/triage/cockpit";
 
 import { rememberDealList } from "./dealList";
 
-export const WARM = "#C8102E"; // Skarv red; validated as a pair with COLD (CVD ΔE 21.9)
-export const COLD = "#1F5FB8";
+const WARM = "#C8102E"; // Skarv red; validated as a pair with COLD (CVD ΔE 21.9)
+const COLD = "#1F5FB8";
 const INK = "#16161a";
 const MUTED = "#5f5b55";
 
@@ -91,8 +91,8 @@ export function MatrixChart({
 
   const legendY = HEIGHT - 40;
   return (
-    <div className="chart-wrap">
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Priority matrix: score % against urgency">
+    <div className="relative rounded-lg border bg-card p-2">
+      <svg className="block h-auto w-full" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Priority matrix: score % against urgency">
         {bands.map((band) => (
           <rect
             key={band.fill}
@@ -158,7 +158,7 @@ export function MatrixChart({
         {rows.map((row) => (
           <g
             key={row.company_id}
-            className="chart-point"
+            className="cursor-pointer outline-none focus-visible:[&>path]:stroke-ring focus-visible:[&>path]:stroke-3"
             transform={`translate(${sx(row.x)},${sy(row.y)})`}
             role="link"
             tabIndex={0}
@@ -216,7 +216,7 @@ export function MatrixChart({
       </svg>
       {hovered ? (
         <div
-          className="tooltip"
+          className="pointer-events-none absolute z-10 rounded-md border bg-popover px-2.5 py-2 text-[13px] leading-normal whitespace-nowrap text-popover-foreground shadow-md"
           style={{
             left: `${(sx(hovered.x) / WIDTH) * 100}%`,
             top: `${(sy(hovered.y) / HEIGHT) * 100}%`,
@@ -228,8 +228,8 @@ export function MatrixChart({
             {(["Company", "Quadrant", "Score %", "Urgency", "Touchpoints", "Source", "Next action", "Owner"] as const).map(
               (field) => (
                 <div key={field}>
-                  <dt>{field}</dt>
-                  <dd>{hovered[field]}</dd>
+                  <dt className="inline text-muted-foreground">{field}</dt>
+                  <dd className="ml-1 inline font-semibold">{hovered[field]}</dd>
                 </div>
               ),
             )}

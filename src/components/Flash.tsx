@@ -5,8 +5,12 @@
  * page and cleared on the next navigation.
  */
 
+import { CircleCheck, X } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+
+import { Alert, AlertAction, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 const FlashContext = createContext<(message: string) => void>(() => {});
 
@@ -31,12 +35,15 @@ export function FlashProvider({ children }: { children: ReactNode }) {
   return (
     <FlashContext.Provider value={show}>
       {message ? (
-        <div className="alert alert-success flash" role="status">
-          <span aria-hidden="true">✅</span> {message}
-          <button type="button" className="flash-close" onClick={() => setMessage(null)} aria-label="Dismiss">
-            ×
-          </button>
-        </div>
+        <Alert variant="success" role="status" className="mb-4 print:hidden">
+          <CircleCheck aria-hidden="true" />
+          <AlertDescription className="text-current">{message}</AlertDescription>
+          <AlertAction>
+            <Button variant="ghost" size="icon-sm" onClick={() => setMessage(null)} aria-label="Dismiss">
+              <X />
+            </Button>
+          </AlertAction>
+        </Alert>
       ) : null}
       {children}
     </FlashContext.Provider>

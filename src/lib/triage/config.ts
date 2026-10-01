@@ -1,12 +1,14 @@
 /**
  * Loads ``config/weights.yaml``, ``config/team.yaml`` and the thesis keywords from
- * ``config/thesis.md``. Server-only: it reads the files once per process, so restart the
- * server after editing them.
+ * ``config/thesis.md``. The files are bundled into the app at build time (``?raw``), so the
+ * rules run in the browser; restart the dev server after editing them.
  */
 
-import fs from "node:fs";
-import path from "node:path";
 import YAML from "yaml";
+
+import teamText from "../../../config/team.yaml?raw";
+import thesisText from "../../../config/thesis.md?raw";
+import weightsText from "../../../config/weights.yaml?raw";
 
 import { parseIsoDate, type IsoDate } from "./dates";
 import { pyStrip } from "./py";
@@ -53,11 +55,6 @@ export interface TeamMember {
 
 export type ThesisKeywords = Record<"strong" | "partial" | "outside", string[]>;
 
-// Fixed paths under config/, so the server bundle traces only these three files.
-const WEIGHTS_PATH = path.join(process.cwd(), "config", "weights.yaml");
-const TEAM_PATH = path.join(process.cwd(), "config", "team.yaml");
-const THESIS_PATH = path.join(process.cwd(), "config", "thesis.md");
-
 function parseYaml(text: string): unknown {
   // YAML 1.1, as PyYAML reads it: an unquoted 2026-09-30 is a date.
   return YAML.parse(text, { version: "1.1" });
@@ -69,7 +66,7 @@ let team: TeamMember[] | null = null;
 
 export function loadTriageConfig(): TriageConfig {
   if (triageConfig === null) {
-    const raw = parseYaml(fs.readFileSync(WEIGHTS_PATH, "utf-8")) as Record<string, unknown>;
+    const raw = parseYaml(weightsText) as Record<string, unknown>;
     const today = raw.demo_today;
     const demoToday =
       today instanceof Date ? today.toISOString().slice(0, 10) : parseIsoDate(String(today));
@@ -86,7 +83,7 @@ export function demoToday(): IsoDate {
 /** The ``strong`` / ``partial`` / ``outside`` keyword lists from thesis.md. */
 export function loadThesisKeywords(): ThesisKeywords {
   if (thesisKeywords === null) {
-    const text = fs.readFileSync(THESIS_PATH, "utf-8");
+    const text = thesisText;
     const keywords = {} as ThesisKeywords;
     for (const level of ["strong", "partial", "outside"] as const) {
       const match = new RegExp(`^\\s*${level}:\\s*(.+)$`, "m").exec(text);
@@ -100,7 +97,7 @@ export function loadThesisKeywords(): ThesisKeywords {
 
 export function loadTeam(): TeamMember[] {
   if (team === null) {
-    team = (parseYaml(fs.readFileSync(TEAM_PATH, "utf-8")) as { team: TeamMember[] }).team;
+    team = (parseYaml(teamText) as { team: TeamMember[] }).team;
   }
   return team;
 }

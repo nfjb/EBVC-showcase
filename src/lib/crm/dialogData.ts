@@ -1,4 +1,4 @@
-/** What the reply dialogs need, built on the server from rows already loaded. */
+/** What the reply dialogs need, built from rows already loaded. */
 
 import type { IntroDialogData, PassDialogData } from "@/components/ReplyDialogs";
 import { demoToday } from "@/lib/triage/config";

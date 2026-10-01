@@ -1,0 +1,41 @@
+# dependencies
+/node_modules
+
+# Next.js build output and generated types
+/.next/
+/out/
+next-env.d.ts
+*.tsbuildinfo
+
+# test coverage
+/coverage
+
+# environment files (the app needs none; keep secrets out if any are added)
+.env*
+!.env.example
+
+# Python (demo/_generate.py)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# local data left over from the old SQLite version
+/data/
+/dealflow_uploads/
+
+# logs and OS / editor clutter
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Claude Code: personal settings stay local; launch.json is shared
+.claude/settings.local.json
+
+# deployment
+.vercel

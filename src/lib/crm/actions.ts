@@ -1,24 +1,19 @@
-"use server";
-
 /**
- * Server actions behind every button. Each one runs a single human action (which writes its
- * Decision row), then refreshes every page. A refusal comes back as a message for the form;
- * nothing is saved in that case.
+ * The actions behind every button. Each one runs a single human action (which writes its
+ * Decision row); every page re-renders from the store. A refusal comes back as a message for
+ * the form; nothing is saved in that case. They run in the browser, against this tab's CRM.
  */
 
-import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
-
 import * as repo from "@/lib/db/repository";
-import { ACTING_COOKIE, actingPerson } from "@/lib/server/person";
-import { createUpload, demoFiles } from "@/lib/server/pipeline";
+import { actingPerson, setActingMember } from "@/lib/crm/person";
+import { createUpload, demoFiles } from "@/lib/crm/pipeline";
 import {
   introducerThanksDraftFor,
   introReplyDraftFor,
   passAndReply,
   passReplyDraftFor,
   sendReply,
-} from "@/lib/server/replies";
+} from "@/lib/crm/replies";
 import {
   advance,
   approveMerge,
@@ -28,27 +23,25 @@ import {
   requireCompany,
   saveRatings,
   setIntroStatus,
-} from "@/lib/server/triageActions";
-import { teamNames } from "@/lib/triage/config";
+} from "@/lib/crm/triageActions";
 import type { ReplyDraft } from "@/lib/triage/drafts";
 import { ActionRefused } from "@/lib/triage/errors";
 
 export type ActionResult = { ok: true; message: string } | { ok: false; error: string };
 
 async function run(action: (person: string) => void, success: string | ((person: string) => string)): Promise<ActionResult> {
-  const person = await actingPerson();
+  const person = actingPerson();
   try {
     action(person);
   } catch (error) {
     if (error instanceof ActionRefused) return { ok: false, error: `Not saved: ${error.message}` };
     console.error(error);
-    return { ok: false, error: "Not saved: something went wrong on the server. Nothing was changed." };
+    return { ok: false, error: "Not saved: something went wrong. Nothing was changed." };
   }
-  revalidatePath("/", "layout");
   return { ok: true, message: typeof success === "string" ? success : success(person) };
 }
 
-/** The edited subject and body, on the server's own draft (recipients are never taken from the browser). */
+/** The edited subject and body, on a freshly built draft (recipients are never taken from the form). */
 function edited(draft: ReplyDraft, subject: string, body: string): ReplyDraft {
   return { ...draft, subject, body };
 }
@@ -59,10 +52,8 @@ function requireIntro(introId: number) {
   return intro;
 }
 
-export async function setActingPersonAction(name: string): Promise<void> {
-  if (!teamNames().includes(name)) return;
-  (await cookies()).set(ACTING_COOKIE, name, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
-  revalidatePath("/", "layout");
+export function setActingPersonAction(name: string): void {
+  setActingMember(name);
 }
 
 export async function saveRatingsAction(
@@ -198,15 +189,13 @@ export async function uploadDealFlowAction(form: FormData): Promise<UploadAction
   const result = createUpload({
     inbound: await fileInput(form, "inbound_file"),
     signals: await fileInput(form, "signals_file"),
-    uploadedBy: await actingPerson(),
+    uploadedBy: actingPerson(),
   });
-  revalidatePath("/", "layout");
   return uploadMessage(result);
 }
 
 export async function uploadDemoFilesAction(): Promise<UploadActionResult> {
   const files = demoFiles();
-  const result = createUpload({ ...files, uploadedBy: await actingPerson() });
-  revalidatePath("/", "layout");
+  const result = createUpload({ ...files, uploadedBy: actingPerson() });
   return uploadMessage(result);
 }

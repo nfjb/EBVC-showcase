@@ -9,7 +9,7 @@ the reserved `.example` domain, and LPs, angels and funds are made up.
   week).
 - `signals.csv`: the enrichment mock (dated hires, traction, news and announced rounds).
 
-Load both with `npm run demo:load`, or upload them on **Deal flow uploads**.
+Upload both on **Deal flow uploads**, or press *Use the bundled demo files* there.
 
 To regenerate them (reproducible, fixed seed):
 

@@ -1,13 +1,13 @@
-/** The pages, their sidebar icons, and links between them. Safe to import from the browser. */
+/** The pages and links between them. Safe to import from the browser. */
 
 export const PAGES = [
-  { name: "Cockpit", href: "/", icon: "🎛️" },
-  { name: "Priority matrix", href: "/matrix", icon: "🧭" },
-  { name: "Deal detail", href: "/deals", icon: "🔎" },
-  { name: "Intro tracker", href: "/intros", icon: "🤝" },
-  { name: "Merge queue", href: "/merges", icon: "🔀" },
-  { name: "Outbox", href: "/outbox", icon: "📤" },
-  { name: "Audit log", href: "/audit", icon: "🧾" },
+  { name: "Cockpit", href: "/" },
+  { name: "Priority matrix", href: "/matrix" },
+  { name: "Deal detail", href: "/deals" },
+  { name: "Intro tracker", href: "/intros" },
+  { name: "Merge queue", href: "/merges" },
+  { name: "Outbox", href: "/outbox" },
+  { name: "Audit log", href: "/audit" },
 ] as const;
 
 /** The records behind the app, as the Lex admin listed them in the sidebar. */

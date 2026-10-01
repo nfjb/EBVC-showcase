@@ -1,18 +1,23 @@
+"use client";
+
 /** Audit log: every decision, rating, rank override and merge — each one a person's click. */
 
 import { AuditTable } from "@/components/Filtered";
+import { Caption, Notice, PageTitle } from "@/components/page";
+import { useCrm } from "@/components/useCrm";
 import * as repo from "@/lib/db/repository";
 import { formatTimestamp } from "@/lib/triage/dates";
 import { label, PASS_CODE_LABELS } from "@/lib/triage/labels";
 
 export default function AuditLogPage() {
+  useCrm();
   const decisions = repo.listDecisions();
   return (
     <>
-      <h1>Audit log</h1>
-      <p className="caption">Every decision, rating, rank override and merge — each one a person&apos;s click.</p>
+      <PageTitle>Audit log</PageTitle>
+      <Caption>Every decision, rating, rank override and merge — each one a person&apos;s click.</Caption>
       {!decisions.length ? (
-        <div className="alert alert-info">No decisions logged yet.</div>
+        <Notice tone="info">No decisions logged yet.</Notice>
       ) : (
         <AuditTable
           rows={decisions.map((decision) => ({

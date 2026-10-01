@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * The Monday cockpit: one list of every company, its open tasks and the next step.
  *
@@ -7,16 +9,22 @@
  * urgent, and the words on the pill say why.
  */
 
+import { CircleCheck, Hourglass, Pin } from "lucide-react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 
 import { ExportControls, NavigateSelect, NextActionPill, type PillAction } from "@/components/CockpitClient";
 import { RememberDealList } from "@/components/dealList";
-import { Metric } from "@/components/Metric";
+import { Caption, Display, Lede, Metric, Metrics, Notice, NUM } from "@/components/page";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useActingMember, useCrm, useSearchRecord } from "@/components/useCrm";
 import * as repo from "@/lib/db/repository";
 import { dealHref, withQuery } from "@/lib/routes";
-import { introReplyDialogData, passDialogData } from "@/lib/server/dialogData";
-import { actingMember } from "@/lib/server/person";
-import { cockpitLines } from "@/lib/server/views";
+import { introReplyDialogData, passDialogData } from "@/lib/crm/dialogData";
+import { cockpitLines } from "@/lib/crm/views";
 import {
   assigneeParts,
   capitalize,
@@ -30,6 +38,7 @@ import {
 import { demoToday, loadTriageConfig, teamNames } from "@/lib/triage/config";
 import { dayMonth, daysBetween, longDateWithYear, type IsoDate } from "@/lib/triage/dates";
 import { CHANNEL_LABELS, label, PASS_CODE_LABELS } from "@/lib/triage/labels";
+import { cn } from "@/lib/utils";
 
 const VIEW_SLUGS: Record<string, View> = { my: "My view", team: "Team view", pipeline: "Pipeline", hot: "Hot topics" };
 const SLUG_FOR_VIEW = Object.fromEntries(Object.entries(VIEW_SLUGS).map(([slug, view]) => [view, slug])) as Record<
@@ -39,19 +48,19 @@ const SLUG_FOR_VIEW = Object.fromEntries(Object.entries(VIEW_SLUGS).map(([slug, 
 const PAGE_SIZE = 30;
 
 type Changes = Record<string, string | null>;
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 function one(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
 
-export default async function CockpitPage({ searchParams }: { searchParams: SearchParams }) {
-  const params = await searchParams;
+export default function CockpitPage() {
+  useCrm();
+  const params = useSearchRecord();
+  const member = useActingMember();
   const view: View = VIEW_SLUGS[one(params.view)] ?? "My view";
   const tile: TileKey = one(params.tile) in TILES ? (one(params.tile) as TileKey) : "top";
   const showAll = one(params.all) === "1";
   const team = teamNames();
-  const member = await actingMember();
   const owner = team.includes(one(params.owner)) ? one(params.owner) : member;
 
   const today = demoToday();
@@ -62,37 +71,39 @@ export default async function CockpitPage({ searchParams }: { searchParams: Sear
 
   return (
     <>
-      <h1 className="display huge">The Monday Cockpit</h1>
-      <div className="kicker">Skarv Ventures · deal-flow triage · {longDateWithYear(today)}</div>
-      <p className="lede">One list: every company, its open tasks, the next step.</p>
+      <Display size="huge">The Monday Cockpit</Display>
+      <div className="mt-2.5 mb-1 text-sm font-semibold tracking-[0.22em] text-primary uppercase">
+        Skarv Ventures · deal-flow triage · {longDateWithYear(today)}
+      </div>
+      <Lede>One list: every company, its open tasks, the next step.</Lede>
 
-      <div className="ck-bar">
-        <nav className="ck-views" aria-label="View">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-t-xl bg-foreground px-4.5 py-2.5 print:hidden">
+        <nav className="flex flex-wrap gap-2" aria-label="View">
           {(Object.keys(SLUG_FOR_VIEW) as View[]).map((name) => (
             <Link
               key={name}
               href={href({ view: SLUG_FOR_VIEW[name] })}
-              className="ck-view"
+              className="rounded-full border border-[#4a4a52] px-4 py-1.5 text-[15px] font-semibold text-background no-underline transition-colors hover:border-background aria-[current=page]:border-primary aria-[current=page]:bg-primary aria-[current=page]:text-primary-foreground"
               aria-current={name === view ? "page" : undefined}
             >
               {name}
             </Link>
           ))}
         </nav>
-        <div className="ck-live">
-          <span className="dot" aria-hidden="true">
-            ●
-          </span>{" "}
-          Demo Data
+        <div className="flex items-center gap-1.5 text-[15px] text-background">
+          <span className="size-2 rounded-full bg-[#3ecf6e]" aria-hidden="true" /> Demo Data
         </div>
       </div>
 
-      <div className="sheet ck-sheet">
+      <div className="rounded-b-xl border border-t-0 bg-paper p-5 shadow-[0_8px_24px_rgb(22_22_26/0.06)] print:border-0 print:p-0 print:shadow-none">
         {!lines.length ? (
-          <div className="alert alert-info">
+          <Notice tone="info">
             No deals loaded yet. Upload <code>demo/inbound_records.csv</code> and <code>demo/signals.csv</code> as a{" "}
-            <Link href="/uploads">Deal flow upload</Link>.
-          </div>
+            <Link className="underline" href="/uploads">
+              Deal flow upload
+            </Link>
+            .
+          </Notice>
         ) : view === "Pipeline" ? (
           <PipelineView lines={lines} />
         ) : view === "Hot topics" ? (
@@ -151,28 +162,40 @@ function WorkList({
           hrefFor={Object.fromEntries(team.map((name) => [name, href({ owner: name })]))}
         />
       ) : null}
-      <div className="tiles no-print">
-        {(Object.keys(TILES) as TileKey[]).map((key) => (
-          <Link
-            key={key}
-            href={href({ tile: key })}
-            className="tile"
-            aria-current={key === tile ? "true" : undefined}
-            aria-label={`Show ${tileLabel(key, view)} (${filters[key].length})`}
-          >
-            <span className={key === "drafts" || key === "tracking" ? "tile-number quiet" : "tile-number"}>
-              {filters[key].length}
-            </span>
-            <span className="tile-label">{tileLabel(key, view)}</span>
-          </Link>
-        ))}
+      <div className="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-5 print:hidden">
+        {(Object.keys(TILES) as TileKey[]).map((key) => {
+          const quiet = key === "drafts" || key === "tracking";
+          return (
+            <Link
+              key={key}
+              href={href({ tile: key })}
+              className="group/tile flex min-h-16 items-center gap-3 rounded-lg border bg-card px-3.5 py-2.5 no-underline transition-colors hover:border-foreground aria-[current=true]:border-foreground aria-[current=true]:bg-foreground"
+              aria-current={key === tile ? "true" : undefined}
+              aria-label={`Show ${tileLabel(key, view)} (${filters[key].length})`}
+            >
+              <span
+                className={cn(
+                  "font-display text-[40px] leading-none",
+                  quiet
+                    ? "text-foreground group-aria-[current=true]/tile:text-background"
+                    : "text-primary group-aria-[current=true]/tile:text-[#ff6b81]",
+                )}
+              >
+                {filters[key].length}
+              </span>
+              <span className="leading-tight text-foreground group-aria-[current=true]/tile:text-background">
+                {tileLabel(key, view)}
+              </span>
+            </Link>
+          );
+        })}
       </div>
 
-      <div className="list-head">
-        <span className="list-title">{title} · score × urgency</span>
-      </div>
+      <ListHead title={`${title} · score × urgency`} />
       {!selected.length ? (
-        <p>✅ Nothing here right now.</p>
+        <p className="flex items-center gap-2">
+          <CircleCheck className="size-4 text-success-foreground" aria-hidden="true" /> Nothing here right now.
+        </p>
       ) : (
         <>
           <RememberDealList title={title} ids={selected.map((line) => line.company.id)} />
@@ -182,12 +205,16 @@ function WorkList({
             currentHref={currentHref}
           />
           {selected.length > PAGE_SIZE ? (
-            <div className="no-print">
-              <p className="caption">
+            <div className="print:hidden">
+              <Caption>
                 Showing {showAll ? selected.length : Math.min(PAGE_SIZE, selected.length)} of {selected.length}.
-              </p>
-              <Link className="toggle" href={href({ all: showAll ? null : "1" })} role="switch" aria-checked={showAll}>
-                <span aria-hidden="true">{showAll ? "◉" : "○"}</span> Show all
+              </Caption>
+              <Link
+                className="inline-flex items-center gap-2 text-sm no-underline"
+                href={href({ all: showAll ? null : "1" })}
+                aria-label={showAll ? "Show all: on" : "Show all: off"}
+              >
+                <Switch checked={showAll} tabIndex={-1} aria-hidden="true" className="pointer-events-none" /> Show all
               </Link>
             </div>
           ) : null}
@@ -214,6 +241,15 @@ function WorkList({
   );
 }
 
+function ListHead({ title, hint }: { title: string; hint?: string }) {
+  return (
+    <div className="mt-4.5 mb-1 flex flex-wrap items-baseline justify-between gap-3">
+      <h2 className="text-base font-bold tracking-[0.06em] uppercase">{title}</h2>
+      {hint ? <span className="text-sm text-muted-foreground italic">{hint}</span> : null}
+    </div>
+  );
+}
+
 function pillAction(line: Line, currentHref: string): PillAction {
   if (line.next_action_kind === "intro" && line.intro) {
     return { kind: "intro", data: introReplyDialogData(line.intro, line.company) };
@@ -226,86 +262,108 @@ function pillAction(line: Line, currentHref: string): PillAction {
 function Assignee({ line }: { line: Line }) {
   const parts = assigneeParts(line);
   return (
-    <div className="assignee">
-      <span className="who">{parts.owner}</span>
-      {parts.role ? <span className="role"> · {capitalize(parts.role)}</span> : null}
-      <span className={parts.hot ? "step hot" : "step"}>{parts.step}</span>
+    <div className="leading-snug">
+      <span className="text-[15px] font-bold">{parts.owner}</span>
+      {parts.role ? <span className="text-[13px] text-muted-foreground"> · {capitalize(parts.role)}</span> : null}
+      <span className={cn("mt-0.5 block text-[13px]", parts.hot ? "font-semibold text-hot" : "text-foreground/85")}>
+        {parts.step}
+      </span>
     </div>
   );
 }
 
 function PriorityTable({ lines, actionable, currentHref }: { lines: Line[]; actionable: boolean; currentHref: string }) {
   return (
-    <div className="table-scroll">
-      <table className="ck-table">
-        <thead>
-          <tr>
-            <th className="rank">#</th>
-            <th>Company</th>
-            <th>Description</th>
-            <th className="num">Score</th>
-            <th className="num">Urgency</th>
-            <th>Open tasks</th>
-            <th>{actionable ? "Next action" : "Assigned to · next step"}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lines.map((line, index) => {
-            const company = line.company;
-            const detail =
-              `${company.stage} · ${company.country}` +
-              (!company.passed_hard_filters ? ` · failed: ${label(PASS_CODE_LABELS, company.pass_code)}` : "") +
-              (line.flag && company.passed_hard_filters ? ` · ⏳ ${line.flag}` : "");
-            const tasksText = line.tasks.join(", ") || "No open tasks";
-            const overdue = line.intro_state?.past_deadline ? "⚠ " : "";
-            return (
-              <tr key={company.id}>
-                <td className="rank">
-                  {index + 1}
-                  {company.rank_override ? (
-                    <span title={`Pinned: ${company.rank_override_comment}`}> 📌</span>
-                  ) : null}
-                </td>
-                <td>
-                  <Link className="company" href={dealHref(company.id, currentHref)} title="Open the deal">
-                    {company.name}
-                  </Link>
-                </td>
-                <td>
-                  <div className="desc">
-                    {company.one_liner}
-                    <small>{detail}</small>
-                  </div>
-                </td>
-                <td className="score-cell">{line.score_percent}</td>
-                <td className={line.urgency >= 80 ? "score-cell hot" : "score-cell"}>{line.urgency}</td>
-                <td style={{ textAlign: "center" }}>
-                  <span
-                    className={line.urgent ? "badge hot" : "badge"}
-                    title={tasksText}
-                    aria-label={`${line.tasks.length} open tasks: ${tasksText}`}
-                  >
-                    {line.tasks.length}
+    <CockpitTable>
+      <TableHeader>
+        <TableRow className="hover:bg-transparent">
+          <TableHead className={RANK}>#</TableHead>
+          <TableHead>Company</TableHead>
+          <TableHead>Description</TableHead>
+          <TableHead className={NUM}>Score</TableHead>
+          <TableHead className={NUM}>Urgency</TableHead>
+          <TableHead>Open tasks</TableHead>
+          <TableHead>{actionable ? "Next action" : "Assigned to · next step"}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {lines.map((line, index) => {
+          const company = line.company;
+          const detail =
+            `${company.stage} · ${company.country}` +
+            (!company.passed_hard_filters ? ` · failed: ${label(PASS_CODE_LABELS, company.pass_code)}` : "");
+          const tasksText = line.tasks.join(", ") || "No open tasks";
+          return (
+            <TableRow key={company.id}>
+              <TableCell className={RANK}>
+                {index + 1}
+                {company.rank_override ? (
+                  <span title={`Pinned: ${company.rank_override_comment}`}>
+                    <Pin className="ml-1 inline size-3.5 text-primary" aria-label="Pinned" />
                   </span>
-                </td>
-                <td>
-                  {actionable ? (
-                    <NextActionPill
-                      label={`${overdue}${line.next_action} →`}
-                      hot={line.urgent}
-                      action={pillAction(line, currentHref)}
-                    />
-                  ) : (
-                    <Assignee line={line} />
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+                ) : null}
+              </TableCell>
+              <TableCell>
+                <Link
+                  className="text-base font-bold text-foreground no-underline hover:text-primary hover:underline"
+                  href={dealHref(company.id, currentHref)}
+                  title="Open the deal"
+                >
+                  {company.name}
+                </Link>
+              </TableCell>
+              <TableCell className="min-w-64 whitespace-normal">
+                <div className="leading-snug text-foreground/90">
+                  {company.one_liner}
+                  <small className="mt-0.5 block text-[13px] leading-tight text-muted-foreground">
+                    {detail}
+                    {line.flag && company.passed_hard_filters ? (
+                      <>
+                        {" · "}
+                        <Hourglass className="inline size-3" aria-hidden="true" /> {line.flag}
+                      </>
+                    ) : null}
+                  </small>
+                </div>
+              </TableCell>
+              <TableCell className={cn(NUM, "text-base")}>{line.score_percent}</TableCell>
+              <TableCell className={cn(NUM, "text-base", line.urgency >= 80 && "font-bold text-hot")}>
+                {line.urgency}
+              </TableCell>
+              <TableCell className="text-center">
+                <Badge
+                  variant={line.urgent ? "default" : "muted"}
+                  className="h-6 min-w-7 font-bold"
+                  title={tasksText}
+                  aria-label={`${line.tasks.length} open tasks: ${tasksText}`}
+                >
+                  {line.tasks.length}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                {actionable ? (
+                  <NextActionPill
+                    label={`${line.intro_state?.past_deadline ? "⚠ " : ""}${line.next_action} →`}
+                    hot={line.urgent}
+                    action={pillAction(line, currentHref)}
+                  />
+                ) : (
+                  <Assignee line={line} />
+                )}
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </CockpitTable>
   );
+}
+
+const RANK = "w-10 text-right text-muted-foreground tabular-nums";
+
+/** The cockpit's own table look: an ink rule under the header, no outer border. */
+function CockpitTable({ children }: { children: ReactNode }) {
+  return <Table className="[&_th]:border-b-2 [&_th]:border-foreground [&_th]:text-[15px] [&_th]:font-bold">{children}</Table>;
 }
 
 /** ``Series.value_counts()``: most frequent first; ties keep first-seen order. */
@@ -323,25 +381,25 @@ function PipelineView({ lines }: { lines: Line[] }) {
   const channels = valueCounts(repo.listTouchpoints().map((touchpoint) => label(CHANNEL_LABELS, touchpoint.channel)));
   return (
     <>
-      <div className="metrics">
+      <Metrics>
         <Metric label="Inbound records" value={repo.countTouchpoints()} />
         <Metric label="Companies after merging" value={lines.length} />
         <Metric label="Passed hard filters" value={passed.length} />
         <Metric label="Decided by the team" value={lines.filter((line) => line.company.status !== "open").length} />
-      </div>
-      <div className="grid-2">
-        <div>
-          <p>
-            <strong>Why companies failed the hard filters</strong>
-          </p>
-          <CountTable heading="Reason" countHeading="Companies" rows={failures} />
-        </div>
-        <div>
-          <p>
-            <strong>Inbound by channel</strong>
-          </p>
-          <CountTable heading="Channel" countHeading="Records" rows={channels} />
-        </div>
+      </Metrics>
+      <div className="grid gap-5 md:grid-cols-2">
+        <Card>
+          <CardContent>
+            <p className="mb-2 font-bold">Why companies failed the hard filters</p>
+            <CountTable heading="Reason" countHeading="Companies" rows={failures} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <p className="mb-2 font-bold">Inbound by channel</p>
+            <CountTable heading="Channel" countHeading="Records" rows={channels} />
+          </CardContent>
+        </Card>
       </div>
     </>
   );
@@ -349,24 +407,22 @@ function PipelineView({ lines }: { lines: Line[] }) {
 
 function CountTable({ heading, countHeading, rows }: { heading: string; countHeading: string; rows: [string, number][] }) {
   return (
-    <div className="table-wrap">
-      <table className="data">
-        <thead>
-          <tr>
-            <th>{heading}</th>
-            <th className="num">{countHeading}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(([name, value]) => (
-            <tr key={name}>
-              <td>{name}</td>
-              <td className="num">{value}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>{heading}</TableHead>
+          <TableHead className={NUM}>{countHeading}</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map(([name, value]) => (
+          <TableRow key={name}>
+            <TableCell>{name}</TableCell>
+            <TableCell className={NUM}>{value}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
 
@@ -389,43 +445,42 @@ function HotTopics({ lines, today, currentHref }: { lines: Line[]; today: IsoDat
   return (
     <>
       <RememberDealList title="Hot topics" ids={recent.map((line) => line.company.id)} />
-      <div className="list-head">
-        <span className="list-title">Hot topics · signals from the last {windowDays} days</span>
-        <span className="hint">Hires, traction and news on open deals</span>
-      </div>
+      <ListHead
+        title={`Hot topics · signals from the last ${windowDays} days`}
+        hint="Hires, traction and news on open deals"
+      />
       {!recent.length ? (
         <p>Nothing new in the window.</p>
       ) : (
-        <div className="table-scroll">
-          <table className="ck-table">
-            <thead>
-              <tr>
-                <th className="rank">Date</th>
-                <th>Company</th>
-                <th>Signal</th>
-                <th>Assigned to · next step</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recent.map((line) => (
-                <tr key={line.company.id}>
-                  <td className="rank">{dayMonth(line.company.latest_signal_at!)}</td>
-                  <td>
-                    <Link className="company" href={dealHref(line.company.id, currentHref)}>
-                      {line.company.name}
-                    </Link>
-                  </td>
-                  <td>
-                    <div className="desc">{line.company.latest_signal}</div>
-                  </td>
-                  <td>
-                    <Assignee line={line} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <CockpitTable>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className={cn(RANK, "w-16")}>Date</TableHead>
+              <TableHead>Company</TableHead>
+              <TableHead>Signal</TableHead>
+              <TableHead>Assigned to · next step</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {recent.map((line) => (
+              <TableRow key={line.company.id}>
+                <TableCell className={cn(RANK, "w-16")}>{dayMonth(line.company.latest_signal_at!)}</TableCell>
+                <TableCell>
+                  <Link
+                    className="text-base font-bold text-foreground no-underline hover:text-primary hover:underline"
+                    href={dealHref(line.company.id, currentHref)}
+                  >
+                    {line.company.name}
+                  </Link>
+                </TableCell>
+                <TableCell className="min-w-64 whitespace-normal leading-snug">{line.company.latest_signal}</TableCell>
+                <TableCell>
+                  <Assignee line={line} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </CockpitTable>
       )}
     </>
   );

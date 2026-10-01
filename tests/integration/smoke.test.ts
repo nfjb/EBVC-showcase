@@ -1,28 +1,15 @@
-/** Smoke tests: the store persists, and an upload refuses missing files. */
+/** Smoke tests: the store round-trips a company, and an upload refuses missing files. */
 
-import os from "node:os";
-import path from "node:path";
-import fs from "node:fs";
-
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import * as repo from "@/lib/db/repository";
-import { createUpload } from "@/lib/server/pipeline";
+import { createUpload, DEMO_LOADER, loadDemoIfEmpty } from "@/lib/crm/pipeline";
 import type { CompanyFields } from "@/lib/triage/pipeline";
 
 import { demoTexts, freshDatabase } from "./helpers";
 
-let uploads: string;
-
 beforeEach(() => {
   freshDatabase();
-  uploads = fs.mkdtempSync(path.join(os.tmpdir(), "skarv-uploads-"));
-  process.env.UPLOADS_DIR = uploads;
-});
-
-afterEach(() => {
-  delete process.env.UPLOADS_DIR;
-  fs.rmSync(uploads, { recursive: true, force: true });
 });
 
 const blank: CompanyFields = {
@@ -67,7 +54,7 @@ describe("smoke", () => {
     expect(repo.listUploads()).toEqual([]);
   });
 
-  it("records a successful upload with its counts and keeps both files", () => {
+  it("records a successful upload with its counts and file names", () => {
     const [inbound, signals] = demoTexts();
     const result = createUpload({
       inbound: { name: "inbound_records.csv", text: inbound },
@@ -79,7 +66,7 @@ describe("smoke", () => {
     expect(upload.status).toBe("success");
     expect(upload.raw_record_count).toBe(412);
     expect(upload.company_count).toBe(repo.countCompanies());
-    expect(fs.readdirSync(uploads)).toHaveLength(2);
+    expect([upload.inbound_file, upload.signals_file]).toEqual(["inbound_records.csv", "signals.csv"]);
   });
 
   it("records a failed upload with its error and changes nothing", () => {
@@ -91,5 +78,17 @@ describe("smoke", () => {
     expect(result.ok).toBe(false);
     expect(repo.listUploads()[0].status).toBe("error");
     expect(repo.countCompanies()).toBe(0);
+  });
+});
+
+describe("demo data on open", () => {
+  it("loads the bundled demo files into an empty CRM, once, without any Decision rows", () => {
+    loadDemoIfEmpty();
+    expect(repo.countCompanies()).toBeGreaterThan(0);
+    expect(repo.listUploads()).toHaveLength(1);
+    expect(repo.listUploads()[0].uploaded_by).toBe(DEMO_LOADER);
+    expect(repo.listDecisions()).toEqual([]);
+    loadDemoIfEmpty();
+    expect(repo.listUploads()).toHaveLength(1);
   });
 });

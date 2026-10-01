@@ -1,48 +1,47 @@
 import type { Metadata } from "next";
+import { Anton, Inter } from "next/font/google";
 import type { ReactNode } from "react";
 
+import { BrowserOnly } from "@/components/BrowserOnly";
 import { FlashProvider } from "@/components/Flash";
 import { ActingPersonSelect, NavLinks } from "@/components/SidebarClient";
-import { actingMember } from "@/lib/server/person";
-import { navigationCounts } from "@/lib/server/views";
-import { teamNames } from "@/lib/triage/config";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 import "./globals.css";
 
-export const dynamic = "force-dynamic";
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const anton = Anton({ subsets: ["latin"], weight: "400", variable: "--font-display" });
 
 export const metadata: Metadata = {
   title: "Skarv Ventures · Deal-flow triage",
   description: "Deal-flow triage for Skarv Ventures — fictional demo data.",
 };
 
-export default async function RootLayout({ children }: { children: ReactNode }) {
-  const counts = navigationCounts();
-  const member = await actingMember();
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en-GB">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&display=swap"
-        />
-      </head>
-      <body>
-        <a className="skip-link" href="#main">
+    <html lang="en-GB" className={cn("font-sans", inter.variable, anton.variable)}>
+      <body className="text-base leading-normal">
+        <a
+          className="absolute top-2 -left-[9999px] z-[100] rounded-md bg-foreground px-3 py-2 text-white focus:left-2"
+          href="#main"
+        >
           Skip to content
         </a>
-        <div className="shell">
-          <aside className="sidebar">
-            <h2 className="brand">Skarv Ventures</h2>
-            <p className="caption">Deal-flow triage · fictional demo data</p>
-            <NavLinks counts={counts} />
-            <hr />
-            <ActingPersonSelect team={teamNames()} current={member} />
+        <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[272px_minmax(0,1fr)]">
+          <aside className="border-r border-sidebar-border bg-sidebar px-4.5 py-6 text-sidebar-foreground lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto print:hidden">
+            <h2 className="mb-0.5 text-[22px] font-bold">Skarv Ventures</h2>
+            <p className="text-sm text-muted-foreground">Deal-flow triage · fictional demo data</p>
+            <BrowserOnly>
+              <NavLinks />
+              <Separator className="my-4.5" />
+              <ActingPersonSelect />
+            </BrowserOnly>
           </aside>
-          <main id="main" className="main">
-            <FlashProvider>{children}</FlashProvider>
+          <main id="main" className="max-w-[1500px] min-w-0 px-4 pt-5 pb-12 lg:px-10 lg:pt-8 lg:pb-16 print:p-0">
+            <BrowserOnly>
+              <FlashProvider>{children}</FlashProvider>
+            </BrowserOnly>
           </main>
         </div>
       </body>

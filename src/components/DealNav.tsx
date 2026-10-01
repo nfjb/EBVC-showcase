@@ -5,13 +5,17 @@
  * page's list ("3 of 20"), previous / next through the list, and a jump-to search.
  */
 
+import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { dealHref } from "@/lib/routes";
 
 import { readDealList, readLastDeal, rememberLastDeal, type RememberedList } from "./dealList";
+import { Caption, Metric } from "./page";
 
 interface KnownDeal {
   id: number;
@@ -80,46 +84,55 @@ export function DealNavBar({
     : "";
 
   return (
-    <div className="deal-nav no-print">
-      <Link className="button" href={returnHref} title={`Back to ${returnLabel}`}>
-        ← {returnLabel}
-      </Link>
-      <div className="crumb">
-        {returnLabel} › {position?.title ?? "…"} · <b>{where}</b>
+    <div className="mb-1.5 grid grid-cols-2 items-center gap-2.5 border-b pb-2.5 lg:grid-cols-[auto_minmax(0,1fr)_auto_auto_minmax(220px,320px)] print:hidden">
+      <Button variant="outline" size="lg" asChild>
+        <Link href={returnHref} title={`Back to ${returnLabel}`}>
+          <ArrowLeft aria-hidden="true" /> {returnLabel}
+        </Link>
+      </Button>
+      <div className="truncate text-sm text-muted-foreground">
+        {returnLabel} › {position?.title ?? "…"} · <b className="text-foreground">{where}</b>
       </div>
       {previousId !== null ? (
-        <Link className="button" href={dealHref(previousId, returnHref)} title={byId.get(previousId)?.name}>
-          ‹ Previous
-        </Link>
+        <Button variant="outline" size="lg" asChild>
+          <Link href={dealHref(previousId, returnHref)} title={byId.get(previousId)?.name}>
+            <ChevronLeft aria-hidden="true" /> Previous
+          </Link>
+        </Button>
       ) : (
-        <button type="button" className="button" disabled>
-          ‹ Previous
-        </button>
+        <Button variant="outline" size="lg" disabled>
+          <ChevronLeft aria-hidden="true" /> Previous
+        </Button>
       )}
       {nextId !== null ? (
-        <Link className="button" href={dealHref(nextId, returnHref)} title={byId.get(nextId)?.name}>
-          Next ›
-        </Link>
+        <Button variant="outline" size="lg" asChild>
+          <Link href={dealHref(nextId, returnHref)} title={byId.get(nextId)?.name}>
+            Next <ChevronRight aria-hidden="true" />
+          </Link>
+        </Button>
       ) : (
-        <button type="button" className="button" disabled>
-          Next ›
-        </button>
+        <Button variant="outline" size="lg" disabled>
+          Next <ChevronRight aria-hidden="true" />
+        </Button>
       )}
-      <select
-        aria-label="Jump to a deal"
+      <Select
         value=""
-        onChange={(event) => {
-          const id = Number(event.target.value);
+        onValueChange={(value) => {
+          const id = Number(value);
           if (id) router.push(dealHref(id, returnHref));
         }}
       >
-        <option value="">Jump to a deal…</option>
-        {deals.map((deal) => (
-          <option key={deal.id} value={deal.id}>
-            {deal.name} · {deal.domain || "no website"}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger className="h-9 w-full bg-card" aria-label="Jump to a deal">
+          <SelectValue placeholder="Jump to a deal…" />
+        </SelectTrigger>
+        <SelectContent className="max-h-96">
+          {deals.map((deal) => (
+            <SelectItem key={deal.id} value={String(deal.id)}>
+              {deal.name} · {deal.domain || "no website"}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
@@ -128,10 +141,10 @@ export function DealNavBar({
 export function RankMetric() {
   const position = useContext(PositionContext);
   return (
-    <div>
-      <div className="metric-label">Rank in {position?.title ?? "list"}</div>
-      <div className="metric-value">{position && position.index !== null ? `#${position.index + 1}` : "–"}</div>
-    </div>
+    <Metric
+      label={`Rank in ${position?.title ?? "list"}`}
+      value={position && position.index !== null ? `#${position.index + 1}` : "–"}
+    />
   );
 }
 
@@ -145,5 +158,5 @@ export function DealRedirect({ known, fallback, returnHref }: { known: number[];
     const target = last !== null && knownSet.has(last) ? last : (list.ids[0] ?? known[0]);
     if (target !== undefined) router.replace(dealHref(target, returnHref));
   }, []);
-  return <p className="caption">Opening the deal…</p>;
+  return <Caption>Opening the deal…</Caption>;
 }

@@ -1,19 +1,21 @@
+"use client";
+
 /** Deal detail with no deal chosen: open the last deal viewed, else the top of the current list. */
 
 import { DealRedirect } from "@/components/DealNav";
+import { useCrm, useSearchRecord } from "@/components/useCrm";
 import * as repo from "@/lib/db/repository";
 import { safeReturnHref } from "@/lib/routes";
-import { rankWorklist } from "@/lib/server/triageActions";
+import { rankWorklist } from "@/lib/crm/triageActions";
 
 import { EmptyCrm } from "./EmptyCrm";
 
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
-
-export default async function DealsPage({ searchParams }: { searchParams: SearchParams }) {
-  const search = await searchParams;
+export default function DealsPage() {
+  useCrm();
+  const search = useSearchRecord();
   const companies = repo.listCompaniesWithTouchpoints();
   if (!companies.length) return <EmptyCrm />;
-  const from = safeReturnHref(Array.isArray(search.from) ? search.from[0] : search.from);
+  const from = safeReturnHref(search.from);
   return (
     <DealRedirect
       known={companies.map((company) => company.id)}

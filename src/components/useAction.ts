@@ -2,12 +2,12 @@
 
 import { useState, useTransition } from "react";
 
-import type { ActionResult } from "@/app/actions";
+import type { ActionResult } from "@/lib/crm/actions";
 
 import { useFlash } from "./Flash";
 
 /**
- * Run a server action from a button: show its refusal inline, or flash its success message
+ * Run an action from a button: show its refusal inline, or flash its success message
  * and call ``onSuccess`` (for example to close the dialog).
  */
 export function useAction() {

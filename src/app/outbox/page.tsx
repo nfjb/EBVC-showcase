@@ -1,24 +1,29 @@
+"use client";
+
 /**
  * Outbox: every reply sent from the app. Sending is simulated: messages are stored here and
  * in the audit log, and never delivered.
  */
 
 import { OutboxList } from "@/components/Filtered";
+import { Caption, Notice, PageTitle } from "@/components/page";
+import { useCrm } from "@/components/useCrm";
 import * as repo from "@/lib/db/repository";
 import { formatShortTimestamp } from "@/lib/triage/dates";
 import { label, MESSAGE_KIND_LABELS } from "@/lib/triage/labels";
 
 export default function OutboxPage() {
+  useCrm();
   const messages = repo.listOutboxMessages();
   return (
     <>
-      <h1>Outbox</h1>
-      <p className="caption">
+      <PageTitle>Outbox</PageTitle>
+      <Caption>
         Every reply sent from the app. Sending is simulated: messages are stored here and in the audit log, and never
         delivered.
-      </p>
+      </Caption>
       {!messages.length ? (
-        <div className="alert alert-info">Nothing sent yet. Reply to an intro in the Intro tracker, or pass on a deal.</div>
+        <Notice tone="info">Nothing sent yet. Reply to an intro in the Intro tracker, or pass on a deal.</Notice>
       ) : (
         <OutboxList
           kindLabels={MESSAGE_KIND_LABELS}

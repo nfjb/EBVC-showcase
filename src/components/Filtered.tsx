@@ -2,7 +2,17 @@
 
 /** The Audit log table and the Outbox list, each with its multi-select filters. */
 
-import { useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { useId, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+import { Caption, DataTable } from "./page";
 
 function MultiSelect({
   label,
@@ -19,34 +29,51 @@ function MultiSelect({
   onChange: (values: string[]) => void;
   format?: (value: string) => string;
 }) {
+  const id = useId();
   const summary = selected.length ? selected.map(format).join(", ") : placeholder;
   return (
-    <div className="field">
-      <span>{label}</span>
-      <details className="multiselect">
-        <summary aria-label={`${label}: ${summary}`}>{summary}</summary>
-        <div className="menu-panel">
-          {options.map((option) => (
-            <label key={option}>
-              <input
-                type="checkbox"
-                checked={selected.includes(option)}
-                onChange={(event) =>
-                  onChange(
-                    event.target.checked ? [...selected, option] : selected.filter((value) => value !== option),
-                  )
-                }
-              />
-              {format(option)}
-            </label>
-          ))}
+    <div className="my-2.5 grid gap-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            id={id}
+            variant="outline"
+            size="lg"
+            className="w-full justify-between bg-card font-normal"
+            aria-label={`${label}: ${summary}`}
+          >
+            <span className="truncate">{summary}</span>
+            <ChevronDown className="text-muted-foreground" aria-hidden="true" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="max-h-80 w-(--radix-popover-trigger-width) min-w-56 overflow-y-auto p-2">
+          <div className="grid gap-1">
+            {options.map((option) => {
+              const optionId = `${id}-${option}`;
+              return (
+                <div key={option} className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-accent">
+                  <Checkbox
+                    id={optionId}
+                    checked={selected.includes(option)}
+                    onCheckedChange={(checked) =>
+                      onChange(checked ? [...selected, option] : selected.filter((value) => value !== option))
+                    }
+                  />
+                  <Label htmlFor={optionId} className="flex-1 cursor-pointer font-normal">
+                    {format(option)}
+                  </Label>
+                </div>
+              );
+            })}
+          </div>
           {selected.length ? (
-            <button type="button" className="button small" onClick={() => onChange([])}>
+            <Button variant="outline" size="sm" className="mt-2" onClick={() => onChange([])}>
               Clear
-            </button>
+            </Button>
           ) : null}
-        </div>
-      </details>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
@@ -70,7 +97,7 @@ export function AuditTable({ rows }: { rows: AuditRow[] }) {
   );
   return (
     <>
-      <div className="grid-2">
+      <div className="grid gap-5 md:grid-cols-2">
         <MultiSelect
           label="Who"
           placeholder="Everyone"
@@ -86,32 +113,30 @@ export function AuditTable({ rows }: { rows: AuditRow[] }) {
           onChange={setKinds}
         />
       </div>
-      <div className="table-wrap tall">
-        <table className="data">
-          <thead>
-            <tr>
-              <th>When (UTC)</th>
-              <th>Who</th>
-              <th>Company</th>
-              <th>Decision</th>
-              <th>Pass reason</th>
-              <th>Comment</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown.map((row) => (
-              <tr key={row.id}>
-                <td style={{ whiteSpace: "nowrap" }}>{row.when}</td>
-                <td>{row.who}</td>
-                <td>{row.company}</td>
-                <td>{row.decision}</td>
-                <td>{row.passReason}</td>
-                <td>{row.comment}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable tall>
+        <TableHeader>
+          <TableRow>
+            <TableHead>When (UTC)</TableHead>
+            <TableHead>Who</TableHead>
+            <TableHead>Company</TableHead>
+            <TableHead>Decision</TableHead>
+            <TableHead>Pass reason</TableHead>
+            <TableHead>Comment</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {shown.map((row) => (
+            <TableRow key={row.id}>
+              <TableCell className="align-top">{row.when}</TableCell>
+              <TableCell className="align-top">{row.who}</TableCell>
+              <TableCell className="align-top">{row.company}</TableCell>
+              <TableCell className="align-top">{row.decision}</TableCell>
+              <TableCell className="align-top">{row.passReason}</TableCell>
+              <TableCell className="align-top whitespace-normal">{row.comment}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </DataTable>
     </>
   );
 }
@@ -129,7 +154,7 @@ export function OutboxList({ items, kindLabels }: { items: OutboxItem[]; kindLab
   const [kinds, setKinds] = useState<string[]>([]);
   return (
     <>
-      <div style={{ maxWidth: 320 }}>
+      <div className="max-w-80">
         <MultiSelect
           label="Type"
           placeholder="All types"
@@ -142,15 +167,21 @@ export function OutboxList({ items, kindLabels }: { items: OutboxItem[]; kindLab
       {items
         .filter((item) => !kinds.length || kinds.includes(item.kind))
         .map((item) => (
-          <details key={item.id} className="expander">
-            <summary>{item.label}</summary>
-            <div className="expander-body">
-              <p className="caption">
+          <Collapsible key={item.id} className="group my-2 rounded-lg border bg-card">
+            <CollapsibleTrigger className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left font-medium">
+              <ChevronDown
+                className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=closed]:-rotate-90"
+                aria-hidden="true"
+              />
+              {item.label}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-3.5 pb-3.5">
+              <Caption>
                 To: {item.address} · Subject: {item.subject}
-              </p>
-              <pre>{item.body}</pre>
-            </div>
-          </details>
+              </Caption>
+              <pre className="m-0 rounded-md bg-muted/60 p-3 font-mono text-sm whitespace-pre-wrap">{item.body}</pre>
+            </CollapsibleContent>
+          </Collapsible>
         ))}
     </>
   );

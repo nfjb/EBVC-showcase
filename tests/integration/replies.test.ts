@@ -3,14 +3,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import * as repo from "@/lib/db/repository";
-import { runPipeline } from "@/lib/server/pipeline";
+import { runPipeline } from "@/lib/crm/pipeline";
 import {
   introducerThanksDraftFor,
   introReplyDraftFor,
   passAndReply,
   passReplyDraftFor,
   sendReply,
-} from "@/lib/server/replies";
+} from "@/lib/crm/replies";
 import { ActionRefused } from "@/lib/triage/errors";
 import type { Touchpoint } from "@/lib/triage/types";
 
@@ -43,7 +43,7 @@ describe("replies", () => {
     expect(messages).toHaveLength(1);
     expect(messages[0].kind).toBe("intro_reply");
     expect(messages[0].sent_by).toBe(PERSON);
-    expect(count("SELECT COUNT(*) AS n FROM decision WHERE decision = 'message_sent'")).toBe(1);
+    expect(count("decision", (row) => row.decision === "message_sent")).toBe(1);
   });
 
   it("names the reason in a pass reply, signed by the person first contacted", () => {
@@ -88,7 +88,7 @@ describe("replies", () => {
     const draft = { ...passReplyDraftFor(company, "outside_stage"), subject: " " };
     expect(() => passAndReply(company.id, "outside_stage", PERSON, "", draft)).toThrow(ActionRefused);
     expect(robotix().status).toBe("open");
-    expect(count("SELECT COUNT(*) AS n FROM decision")).toBe(0);
+    expect(count("decision")).toBe(0);
   });
 
   it("keeps the outbox through a re-upload", () => {

@@ -5,7 +5,14 @@
  * Every draft comes from the one template library and can be edited before it is "sent".
  */
 
-import { useState, type ReactNode } from "react";
+import { Ban, CircleCheck, HandHeart, Mail } from "lucide-react";
+import { useId, useState, type ComponentProps, type ReactNode } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 import {
   advanceAction,
@@ -13,13 +20,36 @@ import {
   passDealAction,
   sendIntroducerThanksAction,
   sendIntroReplyAction,
-} from "@/app/actions";
+} from "@/lib/crm/actions";
 import { PASS_CODES, passReplyDraft, type Founder, type ReplyDraft } from "@/lib/triage/drafts";
 import { ActionRefused } from "@/lib/triage/errors";
 import { label, PASS_CODE_LABELS, SIMULATED_NOTE } from "@/lib/triage/labels";
 
 import { Dialog } from "./Dialog";
+import { Caption, Notice } from "./page";
 import { useAction } from "./useAction";
+
+/** How the button that opens a dialog looks (a shadcn Button's own props). */
+export type TriggerProps = Pick<ComponentProps<typeof Button>, "variant" | "size" | "className">;
+
+/** A labelled form field: the label above its control. */
+export function Field({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: (id: string) => ReactNode;
+  className?: string;
+}) {
+  const id = useId();
+  return (
+    <div className={className ?? "my-2.5 grid gap-1.5"}>
+      <Label htmlFor={id}>{label}</Label>
+      {children(id)}
+    </div>
+  );
+}
 
 function DraftEditor({
   draft,
@@ -35,28 +65,31 @@ function DraftEditor({
   onBody: (value: string) => void;
 }) {
   return (
-    <div className="draft">
-      <p className="caption">
-        To: <strong>{draft.recipient_name || "–"}</strong> · {draft.recipient_address || "no address on file"}
-      </p>
-      <label className="field">
-        <span>Subject</span>
-        <input type="text" value={subject} onChange={(event) => onSubject(event.target.value)} />
-      </label>
-      <label className="field">
-        <span>Message</span>
-        <textarea rows={11} value={body} onChange={(event) => onBody(event.target.value)} />
-      </label>
+    <div>
+      <Caption>
+        To: <strong className="text-foreground">{draft.recipient_name || "–"}</strong> ·{" "}
+        {draft.recipient_address || "no address on file"}
+      </Caption>
+      <Field label="Subject">
+        {(id) => <Input id={id} value={subject} onChange={(event) => onSubject(event.target.value)} />}
+      </Field>
+      <Field label="Message">
+        {(id) => (
+          <Textarea
+            id={id}
+            rows={11}
+            className="min-h-60 leading-relaxed"
+            value={body}
+            onChange={(event) => onBody(event.target.value)}
+          />
+        )}
+      </Field>
     </div>
   );
 }
 
 function ErrorLine({ error }: { error: string | null }) {
-  return error ? (
-    <div className="alert alert-error" role="alert">
-      <span aria-hidden="true">⚠️</span> {error}
-    </div>
-  ) : null;
+  return error ? <Notice tone="error">{error}</Notice> : null;
 }
 
 // ── pass ──────────────────────────────────────────────────────────────────────────
@@ -89,25 +122,32 @@ function PassForm({ data, onDone }: { data: PassDialogData; onDone: () => void }
       <p>
         Passing on <strong>{data.companyName}</strong>. The decision and the reply are logged under your name.
       </p>
-      <label className="field">
-        <span>Reason</span>
-        <select value={passCode} onChange={(event) => setPassCode(event.target.value)}>
-          {PASS_CODES.map((code) => (
-            <option key={code} value={code}>
-              {label(PASS_CODE_LABELS, code)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="field">
-        <span>Comment</span>
-        <input
-          type="text"
-          value={comment}
-          placeholder="Required when the reason is 'Other'"
-          onChange={(event) => setComment(event.target.value)}
-        />
-      </label>
+      <Field label="Reason">
+        {(id) => (
+          <Select value={passCode} onValueChange={setPassCode}>
+            <SelectTrigger id={id} className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PASS_CODES.map((code) => (
+                <SelectItem key={code} value={code}>
+                  {label(PASS_CODE_LABELS, code)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </Field>
+      <Field label="Comment">
+        {(id) => (
+          <Input
+            id={id}
+            value={comment}
+            placeholder="Required when the reason is 'Other'"
+            onChange={(event) => setComment(event.target.value)}
+          />
+        )}
+      </Field>
       {draft ? (
         // A new reason or comment redrafts the reply, discarding edits to the old draft.
         <PassDraft
@@ -120,7 +160,7 @@ function PassForm({ data, onDone }: { data: PassDialogData; onDone: () => void }
           onPassOnly={() => run(() => passDealAction(data.companyId, passCode, comment), onDone)}
         />
       ) : (
-        <div className="alert alert-info">{refusal}</div>
+        <Notice tone="info">{refusal}</Notice>
       )}
       <ErrorLine error={error} />
     </>
@@ -146,14 +186,14 @@ function PassDraft({
         <strong>Reply to the founder</strong> (drafted from the template library, edit freely)
       </p>
       <DraftEditor draft={draft} subject={subject} body={body} onSubject={setSubject} onBody={setBody} />
-      <p className="caption">{SIMULATED_NOTE}</p>
-      <div className="button-row two">
-        <button type="button" className="button primary" disabled={pending} onClick={() => onPassAndSend(subject, body)}>
-          ⛔ Pass and send reply
-        </button>
-        <button type="button" className="button" disabled={pending} onClick={onPassOnly}>
+      <Caption>{SIMULATED_NOTE}</Caption>
+      <div className="my-2.5 grid gap-2.5 sm:grid-cols-2">
+        <Button size="lg" disabled={pending} onClick={() => onPassAndSend(subject, body)}>
+          <Ban aria-hidden="true" /> Pass and send reply
+        </Button>
+        <Button size="lg" variant="outline" disabled={pending} onClick={onPassOnly}>
           Pass without a reply
-        </button>
+        </Button>
       </div>
     </>
   );
@@ -162,18 +202,17 @@ function PassDraft({
 export function PassButton({
   data,
   children,
-  className = "button",
+  ...trigger
 }: {
   data: PassDialogData;
   children: ReactNode;
-  className?: string;
-}) {
+} & TriggerProps) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className={className} onClick={() => setOpen(true)}>
+      <Button variant="outline" {...trigger} onClick={() => setOpen(true)}>
         {children}
-      </button>
+      </Button>
       <Dialog title="Pass on this deal" open={open} onClose={() => setOpen(false)}>
         <PassForm data={data} onDone={() => setOpen(false)} />
       </Dialog>
@@ -199,7 +238,7 @@ function SendForm({
 }: {
   intro: IntroDialogData;
   lead: ReactNode;
-  sendLabel: string;
+  sendLabel: ReactNode;
   send: (subject: string, body: string) => ReturnType<typeof sendIntroReplyAction>;
   onDone: () => void;
 }) {
@@ -210,10 +249,10 @@ function SendForm({
     <>
       <p>{lead}</p>
       <DraftEditor draft={intro.draft} subject={subject} body={body} onSubject={setSubject} onBody={setBody} />
-      <p className="caption">{SIMULATED_NOTE}</p>
-      <button type="button" className="button primary" disabled={pending} onClick={() => run(() => send(subject, body), onDone)}>
+      <Caption>{SIMULATED_NOTE}</Caption>
+      <Button size="lg" disabled={pending} onClick={() => run(() => send(subject, body), onDone)}>
         {sendLabel}
-      </button>
+      </Button>
       <ErrorLine error={error} />
     </>
   );
@@ -222,18 +261,17 @@ function SendForm({
 export function IntroReplyButton({
   data,
   children,
-  className = "button",
+  ...trigger
 }: {
   data: IntroDialogData;
   children: ReactNode;
-  className?: string;
-}) {
+} & TriggerProps) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className={className} onClick={() => setOpen(true)}>
+      <Button variant="outline" {...trigger} onClick={() => setOpen(true)}>
         {children}
-      </button>
+      </Button>
       <Dialog title="Reply to the founder" open={open} onClose={() => setOpen(false)}>
         <SendForm
           intro={data}
@@ -243,7 +281,11 @@ export function IntroReplyButton({
               marks the intro as replied.
             </>
           }
-          sendLabel="✉️ Send reply"
+          sendLabel={
+            <>
+              <Mail aria-hidden="true" /> Send reply
+            </>
+          }
           send={(subject, body) => sendIntroReplyAction(data.introId, subject, body)}
           onDone={() => setOpen(false)}
         />
@@ -252,13 +294,13 @@ export function IntroReplyButton({
   );
 }
 
-export function IntroducerThanksButton({ data, className = "button" }: { data: IntroDialogData; className?: string }) {
+export function IntroducerThanksButton({ data, ...trigger }: { data: IntroDialogData } & TriggerProps) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className={className} onClick={() => setOpen(true)}>
-        🙏 Thank {data.introducerName}
-      </button>
+      <Button variant="outline" {...trigger} onClick={() => setOpen(true)}>
+        <HandHeart aria-hidden="true" /> Thank {data.introducerName}
+      </Button>
       <Dialog title="Thank the introducer" open={open} onClose={() => setOpen(false)}>
         <SendForm
           intro={data}
@@ -267,7 +309,11 @@ export function IntroducerThanksButton({ data, className = "button" }: { data: I
               Close the loop with <strong>{data.introducerName}</strong> about <strong>{data.companyName}</strong>.
             </>
           }
-          sendLabel="🙏 Send thank-you"
+          sendLabel={
+            <>
+              <HandHeart aria-hidden="true" /> Send thank-you
+            </>
+          }
           send={(subject, body) => sendIntroducerThanksAction(data.introId, subject, body)}
           onDone={() => setOpen(false)}
         />
@@ -284,19 +330,13 @@ export function AdvanceForm({ companyId, passButton }: { companyId: number; pass
   const { run, pending, error } = useAction();
   return (
     <>
-      <label className="field">
-        <span>Comment for advancing (optional)</span>
-        <input type="text" value={comment} onChange={(event) => setComment(event.target.value)} />
-      </label>
-      <div className="button-row two">
-        <button
-          type="button"
-          className="button primary"
-          disabled={pending}
-          onClick={() => run(() => advanceAction(companyId, comment))}
-        >
-          ✅ Advance
-        </button>
+      <Field label="Comment for advancing (optional)">
+        {(id) => <Input id={id} value={comment} onChange={(event) => setComment(event.target.value)} />}
+      </Field>
+      <div className="my-2.5 grid grid-cols-2 gap-2.5">
+        <Button size="lg" disabled={pending} onClick={() => run(() => advanceAction(companyId, comment))}>
+          <CircleCheck aria-hidden="true" /> Advance
+        </Button>
         {passButton}
       </div>
       <ErrorLine error={error} />

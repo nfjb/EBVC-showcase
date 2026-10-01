@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
-/** A modal dialog (native ``<dialog>``: focus trap, Escape to close). */
+import { Dialog as DialogRoot, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+/** A modal dialog (focus trap, Escape to close). The body only renders while it is open. */
 export function Dialog({
   title,
   open,
@@ -14,25 +16,14 @@ export function Dialog({
   onClose: () => void;
   children: ReactNode;
 }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  const titleId = useId();
-
-  useEffect(() => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    if (open && !dialog.open) dialog.showModal();
-    if (!open && dialog.open) dialog.close();
-  }, [open]);
-
   return (
-    <dialog ref={ref} className="dialog" onClose={onClose} aria-labelledby={titleId}>
-      <div className="dialog-head">
-        <h2 id={titleId}>{title}</h2>
-        <button type="button" className="dialog-close" onClick={onClose} aria-label="Close">
-          ×
-        </button>
-      </div>
-      {open ? <div className="dialog-body">{children}</div> : null}
-    </dialog>
+    <DialogRoot open={open} onOpenChange={(next) => (next ? null : onClose())}>
+      <DialogContent className="max-h-[calc(100vh-48px)] overflow-y-auto sm:max-w-3xl" aria-describedby={undefined}>
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold">{title}</DialogTitle>
+        </DialogHeader>
+        {open ? <div className="text-sm">{children}</div> : null}
+      </DialogContent>
+    </DialogRoot>
   );
 }

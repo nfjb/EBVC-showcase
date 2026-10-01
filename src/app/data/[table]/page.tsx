@@ -1,12 +1,19 @@
+"use client";
+
 /** Read-only views of the CRM tables, 100 rows a page (what the Lex admin listed in its sidebar). */
 
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, useParams } from "next/navigation";
 
-import { getDb } from "@/lib/db/connection";
+import { useCrm, useSearchRecord } from "@/components/useCrm";
+import type { TableName } from "@/lib/db/connection";
+import { listTablePage } from "@/lib/db/repository";
+import { Caption, DataTable, Notice, PageTitle } from "@/components/page";
+import { Button } from "@/components/ui/button";
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DATA_PAGES, withQuery } from "@/lib/routes";
 
-const TABLES: Record<string, string> = {
+const TABLES: Record<string, TableName> = {
   companies: "company",
   touchpoints: "touchpoint",
   "merge-suggestions": "merge_suggestion",
@@ -16,75 +23,65 @@ const TABLES: Record<string, string> = {
 const PAGE_SIZE = 100;
 const LONG = 120;
 
-type Params = Promise<{ table: string }>;
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
-
-export default async function DataPage({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
-  const { table: slug } = await params;
-  const table = TABLES[slug];
+export default function DataPage() {
+  useCrm();
+  const { table: slug } = useParams<{ table: string }>();
+  const search = useSearchRecord();
   if (!Object.hasOwn(TABLES, slug)) notFound();
-  const search = await searchParams;
-  const page = Math.max(1, Number(Array.isArray(search.page) ? search.page[0] : search.page) || 1);
-  const db = getDb();
-  const total = (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
-  const rows = db
-    .prepare(`SELECT * FROM ${table} ORDER BY id LIMIT ? OFFSET ?`)
-    .all(PAGE_SIZE, (page - 1) * PAGE_SIZE) as Record<string, unknown>[];
-  const columns = (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((column) => column.name);
+  const page = Math.max(1, Number(search.page) || 1);
+  const { total, rows, columns } = listTablePage(TABLES[slug], PAGE_SIZE, (page - 1) * PAGE_SIZE);
   const title = DATA_PAGES.find((candidate) => candidate.href === `/data/${slug}`)?.name ?? slug;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const here = `/data/${slug}`;
 
   return (
     <>
-      <h1>{title}</h1>
-      <p className="caption">
+      <PageTitle>{title}</PageTitle>
+      <Caption>
         {total} row{total === 1 ? "" : "s"} · read-only. Changes are made through the dashboard pages, so each one is
         logged.
-      </p>
+      </Caption>
       {rows.length ? (
-        <div className="table-wrap tall">
-          <table className="data">
-            <thead>
-              <tr>
-                {columns.map((column) => (
-                  <th key={column}>{column}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={String(row.id)}>
-                  {columns.map((column) => {
-                    const text = row[column] === null ? "–" : String(row[column]);
-                    return (
-                      <td key={column} title={text.length > LONG ? text : undefined}>
-                        {text.length > LONG ? `${text.slice(0, LONG)}…` : text}
-                      </td>
-                    );
-                  })}
-                </tr>
+        <DataTable tall>
+          <TableHeader>
+            <TableRow>
+              {columns.map((column) => (
+                <TableHead key={column}>{column}</TableHead>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row) => (
+              <TableRow key={String(row.id)}>
+                {columns.map((column) => {
+                  const text = row[column] === null ? "–" : String(row[column]);
+                  return (
+                    <TableCell key={column} className="align-top" title={text.length > LONG ? text : undefined}>
+                      {text.length > LONG ? `${text.slice(0, LONG)}…` : text}
+                    </TableCell>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableBody>
+        </DataTable>
       ) : (
-        <div className="alert alert-info">Nothing here yet.</div>
+        <Notice tone="info">Nothing here yet.</Notice>
       )}
       {pages > 1 ? (
-        <div className="button-row">
+        <div className="my-2.5 flex flex-wrap items-center gap-2.5">
           {page > 1 ? (
-            <Link className="button" href={withQuery(here, { page: page - 1 })}>
-              ‹ Previous
-            </Link>
+            <Button variant="outline" size="lg" asChild>
+              <Link href={withQuery(here, { page: page - 1 })}>‹ Previous</Link>
+            </Button>
           ) : null}
-          <span className="caption" style={{ alignSelf: "center" }}>
+          <span className="text-sm text-muted-foreground">
             Page {page} of {pages}
           </span>
           {page < pages ? (
-            <Link className="button" href={withQuery(here, { page: page + 1 })}>
-              Next ›
-            </Link>
+            <Button variant="outline" size="lg" asChild>
+              <Link href={withQuery(here, { page: page + 1 })}>Next ›</Link>
+            </Button>
           ) : null}
         </div>
       ) : null}

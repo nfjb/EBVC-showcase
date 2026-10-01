@@ -1,15 +1,21 @@
 # Skarv Ventures deal-flow triage — notes for AI agents
 
-Next.js 16 (App Router) + React 19 + TypeScript + SQLite (`better-sqlite3`). Read
+Next.js 16 (App Router) + React 19 + TypeScript, styled with Tailwind CSS v4 and shadcn/ui
+(Radix, Nova preset). Everything runs in the browser: the CRM is
+an in-memory store in the tab (`src/lib/db/connection.ts`), nothing is persisted. Read
 `README.md` first; the product brief is `docs/planning/mvp-spec.md`.
 
 ## Where things live
 
 - `src/lib/triage/`: the triage rules, pure and framework-free. Change behaviour here.
-- `src/lib/db/`: schema (`schema.ts`) and typed queries (`repository.ts`).
-- `src/lib/server/`: the pipeline run, the human actions, and page data.
-- `src/app/`: pages (server components) and `actions.ts` (server actions).
-- `src/components/`: client components.
+- `src/lib/db/`: the in-memory store (`connection.ts`) and typed queries (`repository.ts`).
+- `src/lib/crm/`: the pipeline run, the human actions (`actions.ts` wraps them for buttons),
+  and page data.
+- `src/app/`: pages (client components; call `useCrm()` so they re-render on changes).
+- `src/components/`: client components. `ui/` is shadcn's generated components (add more with
+  `npx shadcn@latest add <name>`); `page.tsx` has the shared headings, notices and tables.
+- `src/app/globals.css`: Tailwind and the Skarv palette as shadcn theme tokens (`--primary` is
+  Skarv red, `--secondary` is ink). Style with utility classes, not new CSS.
 - `config/`: every number the rules use. Prefer changing config over code.
 
 ## Rules that must hold

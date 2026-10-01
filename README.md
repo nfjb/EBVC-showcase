@@ -9,7 +9,7 @@ one company list, filtered, scored and turned into a Monday worklist. Every deci
 logged human click, and replies are drafted but never actually sent.
 
 This branch is a port of the Lex (Django + Streamlit) app on `main` to **Next.js 16 + React
-19 + SQLite**. The triage rules are unchanged: on the demo data the port computes exactly
+19**, styled with Tailwind CSS and shadcn/ui, running entirely in the browser. The triage rules are unchanged: on the demo data the port computes exactly
 what the Python app computed (see [Fidelity](#fidelity)).
 
 ## Run it
@@ -18,13 +18,16 @@ Requires Node.js 22 or newer.
 
 ```bash
 npm install
-npm run demo:load   # optional: load demo/inbound_records.csv + demo/signals.csv
 npm run dev         # http://localhost:3000
 ```
 
-The CRM is a SQLite file at `data/skarv.sqlite`, created on first use. Instead of
-`demo:load` you can upload the two CSVs on **Deal flow uploads** (or press *Use the bundled
-demo files* there). Each upload rebuilds the CRM; the audit log and the Outbox are kept.
+The CRM lives in the browser tab's memory: nothing is written to disk or sent to a server,
+so the app is a set of static pages that can be hosted anywhere (Vercel included). The app
+opens with the bundled demo files (`demo/inbound_records.csv`, `demo/signals.csv`) already
+loaded, listed on **Deal flow uploads** as "Demo data (loaded when the app opened)". Upload
+other CSVs there to replace them; each upload rebuilds the CRM and keeps the audit log and
+the Outbox. Move between pages with the in-app links: they keep the tab's state, while a
+reload starts again from the demo data and drops every click made since.
 
 ```bash
 npm test            # unit + integration tests (Vitest)
@@ -50,14 +53,13 @@ Every decision is logged under "<name> (demo)".
 
 ## Configuration
 
-All the rules live in `config/` and are read at server start (restart after editing):
+All the rules live in `config/` and are bundled into the app (restart `npm run dev` after editing):
 
 - `config/weights.yaml`: score weights, hard filters, queue flags, SLA, urgency, cockpit and
   matrix settings, and the demo's fixed "today" (2026-09-30).
 - `config/thesis.md`: the thesis and the keywords behind the suggested thesis fit.
 - `config/team.yaml`: the team, their roles and who each escalates to.
 
-Environment variables (all optional, see `.env.example`): `DATABASE_PATH` and `UPLOADS_DIR`.
 
 ## Layout
 
@@ -65,12 +67,12 @@ Environment variables (all optional, see `.env.example`): `DATABASE_PATH` and `U
 config/               the triage rules (weights, thesis, team)
 demo/                 the demo CSVs and their generator (_generate.py)
 src/lib/triage/       the rules, pure: normalise, dedup, filters, scoring, urgency, drafts…
-src/lib/db/           SQLite schema and queries
-src/lib/server/       pipeline run, human actions (each writes its audit row), page data
-src/app/              the pages and their server actions
-src/components/       client components (dialogs, chart, filters, navigation)
+src/lib/db/           the in-memory store and its queries
+src/lib/crm/          pipeline run, human actions (each writes its audit row), page data
+src/app/              the pages (client components reading the store)
+src/components/       client components (dialogs, chart, filters, navigation); ui/ is shadcn/ui
 tests/unit/           pure-logic tests
-tests/integration/    pipeline and human actions over the demo files, on in-memory SQLite
+tests/integration/    pipeline and human actions over the demo files, on a fresh in-memory store
 ```
 
 ## Fidelity
@@ -90,8 +92,8 @@ and 1,200 working-day cases.
 
 ### What changed with the move off Lex
 
-- **Storage**: SQLite (`better-sqlite3`) instead of the Lex-managed PostgreSQL. Same tables,
-  same delete rules (a re-upload or merge keeps the audit log and Outbox, with the company
+- **Storage**: an in-memory store in the browser tab instead of the Lex-managed PostgreSQL.
+  Same tables, same delete rules (a re-upload or merge keeps the audit log and Outbox, with the company
   link set to NULL).
 - **Sign-in**: Keycloak/OIDC came with Lex and is not carried over. The demo's "Acting as"
   picker (the Streamlit app's fallback when nobody was signed in) is the only identity.

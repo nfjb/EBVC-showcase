@@ -1,15 +1,20 @@
+"use client";
+
 /** Deal detail: one company — decide, see why it scores what it does, its history, pin its rank. */
 
-import { redirect } from "next/navigation";
+import { Ban, Hourglass } from "lucide-react";
+import { redirect, useParams } from "next/navigation";
 
 import { DecideSection, RankOverrideForm } from "@/components/DealForms";
 import { DealNavBar, DealPosition, RankMetric } from "@/components/DealNav";
-import { Metric } from "@/components/Metric";
+import { Caption, DataTable, Eyebrow, Metric, Metrics, Notice, NUM, PageTitle } from "@/components/page";
 import { Tabs } from "@/components/Tabs";
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useCrm, useSearchRecord } from "@/components/useCrm";
 import * as repo from "@/lib/db/repository";
 import { pageNameFor, safeReturnHref, withQuery } from "@/lib/routes";
-import { introducerThanksDialogData, introReplyDialogData, passDialogData } from "@/lib/server/dialogData";
-import { daysInQueue, rankWorklist } from "@/lib/server/triageActions";
+import { introducerThanksDialogData, introReplyDialogData, passDialogData } from "@/lib/crm/dialogData";
+import { daysInQueue, rankWorklist } from "@/lib/crm/triageActions";
 import { compareCodePoints, pyFixed } from "@/lib/triage/py";
 import { loadTriageConfig } from "@/lib/triage/config";
 import {
@@ -28,13 +33,11 @@ import { maximumScore } from "@/lib/triage/urgency";
 
 import { EmptyCrm } from "../EmptyCrm";
 
-type Params = Promise<{ id: string }>;
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
-
-export default async function DealDetailPage({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
-  const { id } = await params;
-  const search = await searchParams;
-  const from = safeReturnHref(Array.isArray(search.from) ? search.from[0] : search.from);
+export default function DealDetailPage() {
+  useCrm();
+  const { id } = useParams<{ id: string }>();
+  const search = useSearchRecord();
+  const from = safeReturnHref(search.from);
   const companies = repo.listCompaniesWithTouchpoints();
   if (!companies.length) return <EmptyCrm />;
   const company = companies.find((candidate) => candidate.id === Number(id));
@@ -59,8 +62,8 @@ export default async function DealDetailPage({ params, searchParams }: { params:
           .map((item) => ({ id: item.id, name: item.name, domain: item.website_domain }))}
       />
 
-      <div className="eyebrow">Deal detail</div>
-      <h1>{company.name}</h1>
+      <Eyebrow>Deal detail</Eyebrow>
+      <PageTitle>{company.name}</PageTitle>
       <p>
         {company.one_liner}
         <br />
@@ -68,22 +71,29 @@ export default async function DealDetailPage({ params, searchParams }: { params:
         <strong>{company.owner}</strong> · {company.website_domain || "no website"}
       </p>
 
-      <div className="metrics">
+      <Metrics>
         <Metric label="Decision" value={label(DECISION_LABELS, company.status)} />
         <RankMetric />
         <Metric label="Score" value={`${pyFixed(company.score, 1)} / ${pyFixed(maximumScore(), 0)}`} />
         <Metric label="Days in queue" value={waiting} />
         <Metric label="Touchpoints" value={company.touchpoint_count} />
-      </div>
+      </Metrics>
       {flag ? (
-        <div className="alert alert-warning">
-          ⏳ {flag} — {waiting} days in the queue.
-        </div>
+        <Notice tone="warning">
+          <span className="inline-flex items-center gap-1.5">
+            <Hourglass className="size-4" aria-hidden="true" /> {flag} — {waiting} days in the queue.
+          </span>
+        </Notice>
       ) : null}
       {!company.passed_hard_filters ? (
-        <div className="alert alert-info">⛔ Failed the hard filters: {label(PASS_CODE_LABELS, company.pass_code)}.</div>
+        <Notice tone="info">
+          <span className="inline-flex items-center gap-1.5">
+            <Ban className="size-4" aria-hidden="true" /> Failed the hard filters:{" "}
+            {label(PASS_CODE_LABELS, company.pass_code)}.
+          </span>
+        </Notice>
       ) : null}
-      {company.latest_signal ? <p className="caption">Latest signal: {company.latest_signal}</p> : null}
+      {company.latest_signal ? <Caption>Latest signal: {company.latest_signal}</Caption> : null}
 
       <Tabs labels={["Decide", "Score breakdown", `History (${company.touchpoint_count})`, "Rank override"]}>
         <DecideSection
@@ -105,62 +115,58 @@ export default async function DealDetailPage({ params, searchParams }: { params:
 
         <div>
           {breakdown.length ? (
-            <div className="table-wrap">
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th>Component</th>
-                    <th className="num">Value</th>
-                    <th className="num">Weight</th>
-                    <th className="num">Points</th>
-                    <th>Note</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {breakdown.map((row) => (
-                    <tr key={row.component}>
-                      <td>{componentLabel(row.component)}</td>
-                      <td className="num">{rating(row.value)}</td>
-                      <td className="num">{pyFixed(row.weight, 1)}</td>
-                      <td className="num">{pyFixed(row.points, 1)}</td>
-                      <td>{row.note}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Component</TableHead>
+                  <TableHead className={NUM}>Value</TableHead>
+                  <TableHead className={NUM}>Weight</TableHead>
+                  <TableHead className={NUM}>Points</TableHead>
+                  <TableHead>Note</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {breakdown.map((row) => (
+                  <TableRow key={row.component}>
+                    <TableCell>{componentLabel(row.component)}</TableCell>
+                    <TableCell className={NUM}>{rating(row.value)}</TableCell>
+                    <TableCell className={NUM}>{pyFixed(row.weight, 1)}</TableCell>
+                    <TableCell className={NUM}>{pyFixed(row.points, 1)}</TableCell>
+                    <TableCell className="whitespace-normal">{row.note}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </DataTable>
           ) : null}
-          <p className="caption">Time in queue is not a score component. Team and market are rated by people only.</p>
+          <Caption>Time in queue is not a score component. Team and market are rated by people only.</Caption>
         </div>
 
-        <div className="table-wrap">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>Received</th>
-                <th>Channel</th>
-                <th>Sent to</th>
-                <th>Name used</th>
-                <th>Website</th>
-                <th>Introducer</th>
-                <th>Intro status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((touchpoint) => (
-                <tr key={touchpoint.id}>
-                  <td>{touchpoint.received_at}</td>
-                  <td>{label(CHANNEL_LABELS, touchpoint.channel)}</td>
-                  <td>{touchpoint.recipient}</td>
-                  <td>{touchpoint.company_name}</td>
-                  <td>{touchpoint.website}</td>
-                  <td>{touchpoint.introducer_name}</td>
-                  <td>{INTRO_LABELS[touchpoint.intro_status] ?? ""}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Received</TableHead>
+              <TableHead>Channel</TableHead>
+              <TableHead>Sent to</TableHead>
+              <TableHead>Name used</TableHead>
+              <TableHead>Website</TableHead>
+              <TableHead>Introducer</TableHead>
+              <TableHead>Intro status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {history.map((touchpoint) => (
+              <TableRow key={touchpoint.id}>
+                <TableCell>{touchpoint.received_at}</TableCell>
+                <TableCell>{label(CHANNEL_LABELS, touchpoint.channel)}</TableCell>
+                <TableCell>{touchpoint.recipient}</TableCell>
+                <TableCell>{touchpoint.company_name}</TableCell>
+                <TableCell>{touchpoint.website}</TableCell>
+                <TableCell>{touchpoint.introducer_name}</TableCell>
+                <TableCell>{INTRO_LABELS[touchpoint.intro_status] ?? ""}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </DataTable>
 
         <RankOverrideForm key={company.rank_override ?? 0} companyId={company.id} current={company.rank_override} />
       </Tabs>
