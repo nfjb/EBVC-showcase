@@ -39,8 +39,8 @@ npm run build && npm start
 
 | Page | What it is for |
 | --- | --- |
-| **Cockpit** | My view / Team view / Pipeline / Hot topics. KPI tiles double as quick filters; the table is ranked by Importance Score × Urgency Score; CSV export and a print view for the Monday meeting |
-| **Priority matrix** | Every open, filter-passing deal on Importance Score × Urgency Score, in four quadrants. Click a bubble to open the deal |
+| **Cockpit** | My view / Team view / Pipeline / Hot topics. KPI tiles double as quick filters; the table is ranked by Quality Score × Urgency Score; CSV export and a print view for the Monday meeting |
+| **Priority matrix** | Every open, filter-passing deal on Quality Score × Urgency Score, in four quadrants. Click a bubble to open the deal |
 | **Deal detail** | Fathom ratings (ten dimensions, 1–5, plus a storytelling bonus) with a live score preview, advance / pass with a drafted reply, warm-intro reply and thank-you, score breakdown, touchpoint history, rank override |
 | **Intro tracker** | Warm intros against the three-working-day SLA: day-2 reminder, day-3 escalation to the responsible partner |
 | **Merge queue** | Fuzzy name matches waiting for a person: same company (merge) or different |
@@ -140,7 +140,7 @@ npm run demo:prerate
 Companies the file does not cover (any other upload) are rated by the live agent (OpenAI)
 only when someone presses **Rate with the Fathom agent** on Deal flow uploads, since it
 spends credits; a progress bar shows at the top of every page while it runs. A deal nobody has rated yet scores 0 %, shows "–" in
-the cockpit's Importance Score column (the Fathom score %), and is ordered by urgency. The matrix's score line sits at 60 %
+the cockpit's Quality Score column (the Fathom score %), and is ordered by urgency. The matrix's score line sits at 60 %
 (the watchlist line).
 
 The agent sees company-level information only: deck text, one-liner, stage, round, channels,
@@ -166,8 +166,8 @@ is in `src/lib/triage/urgency.ts`; every number is in `config/weights.yaml` → 
 `Urgency Score = round(raw / 120 × 100)`. Tiers: 80+ act today, 60–79 this week, 40–59 soon,
 20–39 monitor, below 20 no rush. No score is ever 0: a single cold inbound scores 4 raw.
 
-**Priority** (the Total Score column) = Importance Score × Urgency Score / 100. The cockpit
-ranks by priority, then Importance Score, then Urgency Score, then name; a rank pinned by a
+**Priority** (the Total Score column) = Quality Score × Urgency Score / 100. The cockpit
+ranks by priority, then Quality Score, then Urgency Score, then name; a rank pinned by a
 person keeps its place. The priority matrix splits Urgency Score at 40, where the "Soon" tier
 starts: open warm intros land above it.
 

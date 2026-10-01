@@ -50,7 +50,7 @@ export const QUADRANT_COLOURS: Record<QuadrantKey, string> = {
 const Y_DOMAIN: [number, number] = [20, 100];
 const TOOLTIP_FIELDS = [
   ["Quadrant", "Quadrant"],
-  ["Score %", "Importance Score"],
+  ["Score %", "Quality Score"],
   ["Urgency", "Urgency Score"],
   ["Touchpoints", "Touchpoints"],
   ["Source", "Source"],
@@ -107,7 +107,9 @@ function DealTooltip({ active, payload }: { active?: boolean; payload?: { payloa
         {TOOLTIP_FIELDS.map(([field, fieldLabel]) => (
           <div key={field} className="flex justify-between gap-4">
             <dt className="text-muted-foreground">{fieldLabel}</dt>
-            <dd className="font-medium text-foreground tabular-nums">{row[field]}</dd>
+            <dd className="font-medium text-foreground tabular-nums">
+              {field === "Score %" ? `${row[field]} %` : row[field]}
+            </dd>
           </div>
         ))}
       </dl>
@@ -224,7 +226,7 @@ export function MatrixChart({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{rows.length} open deals by Importance Score and Urgency Score</CardTitle>
+        <CardTitle>{rows.length} open deals by Quality Score and Urgency Score</CardTitle>
         <CardDescription>Hover a deal for details; click it to open the deal.</CardDescription>
         <CardAction className="max-sm:col-start-1 max-sm:row-start-3 max-sm:justify-self-start">
           <Legend />
@@ -235,7 +237,7 @@ export function MatrixChart({
           config={CONFIG}
           className="aspect-auto h-[460px] w-full"
           role="img"
-          aria-label="Priority matrix: Importance Score against Urgency Score. The table below lists every deal shown."
+          aria-label="Priority matrix: Quality Score against Urgency Score. The table below lists every deal shown."
         >
           <ScatterChart margin={{ top: 8, right: 16, bottom: 28, left: 0 }}>
             {zones.map((zone) => (
@@ -260,14 +262,14 @@ export function MatrixChart({
             <XAxis
               type="number"
               dataKey="x"
-              name="Importance Score"
+              name="Quality Score"
               domain={[xLow, xHigh]}
               ticks={xTicks}
               tickLine={false}
               axisLine={false}
               tickFormatter={(value: number) => `${value} %`}
               label={{
-                value: "Importance Score",
+                value: "Quality Score",
                 position: "insideBottom",
                 offset: -18,
                 className: "fill-muted-foreground text-xs",

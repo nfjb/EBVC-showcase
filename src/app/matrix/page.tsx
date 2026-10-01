@@ -15,8 +15,8 @@ import { RememberDealList } from "@/components/dealList";
 import { HeaderActions } from "@/components/HeaderActions";
 import {
   ariaSort,
-  ImportanceHeader,
-  ImportanceValue,
+  QualityHeader,
+  QualityValue,
   nextSort,
   readSort,
   sortByScore,
@@ -67,8 +67,8 @@ export default function MatrixPage() {
     <>
       <PageHeader
         title="Priority matrix"
-        eyebrow="Importance Score × Urgency Score"
-        description="Every open deal that passed the hard filters, placed by Importance Score (the Fathom rating) and Urgency Score. Time in queue is not part of either axis."
+        eyebrow="Quality Score × Urgency Score"
+        description="Every open deal that passed the hard filters, placed by Quality Score (the Fathom rating) and Urgency Score. Time in queue is not part of either axis."
       />
       <HeaderActions>
         <NavigateSelect
@@ -117,13 +117,13 @@ function MatrixBody({
   const shown = sortByScore(
     byPriorityThenScore(selected ? rows.filter((row) => row.quadrant_key === selected) : rows),
     sort,
-    (row) => ({ importance: row["Score %"], urgency: row.Urgency, total: row.Priority }),
+    (row) => ({ quality: row["Score %"], urgency: row.Urgency, total: row.Priority }),
   );
   const sortHref = (column: SortColumn) =>
     withQuery("/matrix", { owner: ownerParam, q: selected, ...nextSort(sort, column) });
   const orderNote = !sort.column
     ? "highest priority first"
-    : `by ${{ importance: "Importance Score", urgency: "Urgency Score", total: "Total Score" }[sort.column]}, ${
+    : `by ${{ quality: "Quality Score", urgency: "Urgency Score", total: "Total Score" }[sort.column]}, ${
         sort.direction === "asc" ? "lowest" : "highest"
       } first`;
   const title = selected ? QUADRANTS[selected][0] : "All deals on the matrix";
@@ -189,8 +189,8 @@ function MatrixBody({
         <TableHeader>
           <TableRow>
             <TableHead>Company</TableHead>
-            <TableHead className={NUM} aria-sort={ariaSort(sort, "importance")}>
-              <ImportanceHeader sort={sort} sortHref={sortHref("importance")} />
+            <TableHead className={NUM} aria-sort={ariaSort(sort, "quality")}>
+              <QualityHeader sort={sort} sortHref={sortHref("quality")} />
             </TableHead>
             <TableHead className={NUM} aria-sort={ariaSort(sort, "urgency")}>
               <UrgencyHeader sort={sort} sortHref={sortHref("urgency")} />
@@ -215,13 +215,13 @@ function MatrixBody({
                 </Link>
               </TableCell>
               <TableCell className={NUM}>
-                <ImportanceValue company={companies.get(row.company_id) ?? {}} />
+                <QualityValue company={companies.get(row.company_id) ?? {}} />
               </TableCell>
               <TableCell className={NUM}>
                 <UrgencyValue breakdown={row.urgency_breakdown} />
               </TableCell>
               <TableCell className={NUM}>
-                <TotalValue importance={row["Score %"]} urgency={row.Urgency} total={row.Priority} />
+                <TotalValue quality={row["Score %"]} urgency={row.Urgency} total={row.Priority} />
               </TableCell>
               <TableCell className={NUM}>{row.Touchpoints}</TableCell>
               <TableCell>{row.Source}</TableCell>

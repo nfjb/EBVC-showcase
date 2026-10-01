@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * How scores work: the Importance Score (the Fathom criteria) in detail, the Urgency Score,
+ * How scores work: the Quality Score (the Fathom criteria) in detail, the Urgency Score,
  * and how both make the priority and the matrix. Every number is read from
  * config/weights.yaml, and the worked example is a live deal, so the page cannot drift from
  * the calculation.
@@ -30,7 +30,7 @@ import { FATHOM_DIMENSIONS, ratedCount, ratingsOf, scoreBand, scoreCompany } fro
 import { maxUrgencyRaw, QUADRANTS, urgencySummary, type QuadrantKey } from "@/lib/triage/urgency";
 
 const SECTIONS = [
-  { id: "importance", title: "Importance Score" },
+  { id: "quality", title: "Quality Score" },
   { id: "who-rates", title: "Who rates" },
   { id: "example", title: "Worked example" },
   { id: "urgency", title: "Urgency Score" },
@@ -73,7 +73,7 @@ export default function ScoringPage() {
     <>
       <PageHeader
         title="How scores work"
-        description="Every deal gets two scores. The Importance Score says how good an investment it looks; the Urgency Score says how pressing it is. Together they set the order of the cockpit and the place on the priority matrix."
+        description="Every deal gets two scores. The Quality Score says how good an investment it looks; the Urgency Score says how pressing it is. Together they set the order of the cockpit and the place on the priority matrix."
       />
 
       <nav aria-label="On this page" className="mb-2 flex flex-wrap gap-2">
@@ -84,10 +84,10 @@ export default function ScoringPage() {
         ))}
       </nav>
 
-      {/* ── Importance Score ─────────────────────────────────────────────────── */}
+      {/* ── Quality Score ─────────────────────────────────────────────────── */}
       <Section
-        id="importance"
-        title="Importance Score"
+        id="quality"
+        title="Quality Score"
         description="The Fathom investment criteria for Pre-Seed and Seed: ten dimensions that almost every early-stage venture decision rests on, each rated from 1 to 5 and weighted by how much it matters."
       >
         <div className="grid gap-4 lg:grid-cols-2">
@@ -98,7 +98,7 @@ export default function ScoringPage() {
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <Formula>
-                Importance Score = Σ ( weight × rating / {fathom.scale_max} ) + storytelling bonus, capped at 100
+                Quality Score = Σ ( weight × rating / {fathom.scale_max} ) + storytelling bonus, capped at 100
               </Formula>
               <ul className="list-disc space-y-1 pl-5">
                 <li>The weights add up to 100 %, so a deal rated {fathom.scale_max} everywhere scores 100.</li>
@@ -199,7 +199,7 @@ export default function ScoringPage() {
             <DataTable>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Importance Score</TableHead>
+                  <TableHead>Quality Score</TableHead>
                   <TableHead>Band</TableHead>
                 </TableRow>
               </TableHeader>
@@ -303,7 +303,7 @@ export default function ScoringPage() {
       <Section
         id="example"
         title="Worked example"
-        description="A live deal from the CRM, the highest Importance Score right now."
+        description="A live deal from the CRM, the highest Quality Score right now."
       >
         <WorkedExample labels={labels} />
       </Section>
@@ -428,9 +428,9 @@ export default function ScoringPage() {
               <CardDescription>The order of every worklist in the cockpit.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              <Formula>Priority = Importance Score × Urgency Score / 100</Formula>
+              <Formula>Priority = Quality Score × Urgency Score / 100</Formula>
               <p>
-                Ties go to the higher Importance Score, then the higher Urgency Score, then the name. A rank a person
+                Ties go to the higher Quality Score, then the higher Urgency Score, then the name. A rank a person
                 pins on the deal page keeps its place, with the reason logged.
               </p>
             </CardContent>
@@ -439,7 +439,7 @@ export default function ScoringPage() {
             <CardHeader>
               <CardTitle>The four quadrants</CardTitle>
               <CardDescription>
-                Split at Importance Score {matrix.score_split} % (the watchlist line) and Urgency Score{" "}
+                Split at Quality Score {matrix.score_split} % (the watchlist line) and Urgency Score{" "}
                 {matrix.urgency_split}, where the &ldquo;Soon&rdquo; tier starts (open warm intros land above it).
               </CardDescription>
             </CardHeader>
@@ -540,7 +540,7 @@ function WorkedExample({ labels }: { labels: Record<string, string> }) {
               </TableRow>
             ))}
             <TableRow className="font-semibold hover:bg-transparent">
-              <TableCell colSpan={4}>Importance Score</TableCell>
+              <TableCell colSpan={4}>Quality Score</TableCell>
               <TableCell className={NUM}>{pyFixed(score, 1)}</TableCell>
             </TableRow>
           </TableBody>

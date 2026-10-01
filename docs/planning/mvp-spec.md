@@ -90,7 +90,7 @@ Allow a manual rank override with a required comment.
   day 3: escalate to responsible partner). Include a "close the loop"
   action that drafts a thank-you note to the introducer.
 - Lane B — Top-20 worklist: filter-passing, open deals ranked by score.
-  *Changed 2026-10-01: ranked by priority = Importance Score × Urgency Score / 100; the
+  *Changed 2026-10-01: ranked by priority = Quality Score × Urgency Score / 100; the
   Urgency Score has five dimensions (reply obligation, relationship, activity signal,
   competitive pressure, founder momentum), never time in queue. See README.*
 

@@ -59,7 +59,7 @@ worklist_size: 20
 
 # Urgency Score: how pressing a deal is, built like the LP scoring matrix: five dimensions
 # with point tables, a raw sum out of 120, normalised to 0–100 (round(raw / 120 × 100)) and
-# reported as both, e.g. "77/100 (raw 92/120)". Priority = Importance Score × Urgency Score.
+# reported as both, e.g. "77/100 (raw 92/120)". Priority = Quality Score × Urgency Score.
 # Time in queue is never an input (user decision 2026-09-30): it only raises the 14/21-day flags.
 urgency:
   # 1. Reply obligation (0–40): an open warm intro, by its reply-deadline stage.
@@ -106,7 +106,7 @@ cockpit:
   hot_topic_days: 45
   long_tracking_days: 90
 
-# Priority matrix: where the quadrant lines sit (Importance and Urgency Score, both 0-100).
+# Priority matrix: where the quadrant lines sit (Quality and Urgency Score, both 0-100).
 # Score split 60 is the Fathom watchlist line; urgency split 40 is where the "Soon" tier
 # starts: in the demo data it puts every open warm intro (49 and up) on the urgent side, and
 # the rest (3–42) below it unless a very fresh, strong signal lifts it over.

@@ -20,8 +20,8 @@ import { HeaderActions } from "@/components/HeaderActions";
 import { ScoreHint } from "@/components/ScoreHint";
 import {
   ariaSort,
-  ImportanceHeader,
-  ImportanceValue,
+  QualityHeader,
+  QualityValue,
   nextSort,
   readSort,
   sortByScore,
@@ -179,7 +179,7 @@ function WorkList({
   const ranked = filters[tile];
   const rankOf = new Map(ranked.map((line, index) => [line.company.id, index + 1]));
   const selected = sortByScore(ranked, sort, (line) => ({
-    importance: line.company.score,
+    quality: line.company.score,
     urgency: line.urgency,
     total: line.priority,
   }));
@@ -229,7 +229,7 @@ function WorkList({
         })}
       </div>
 
-      <ListHead title={`${title} · Importance Score × Urgency Score`} />
+      <ListHead title={`${title} · Quality Score × Urgency Score`} />
       {!selected.length ? (
         <p className="flex items-center gap-2">
           <CircleCheck className="size-4 text-success-foreground" aria-hidden="true" /> Nothing here right now.
@@ -271,7 +271,7 @@ function WorkList({
           Description: line.company.one_liner,
           Stage: line.company.stage,
           Country: line.company.country,
-          "Importance Score": line.score_percent,
+          "Quality Score": line.score_percent,
           "Urgency Score": line.urgency,
           "Total Score": line.priority,
           "Open tasks": line.tasks.join("; "),
@@ -337,8 +337,8 @@ function PriorityTable({
         <TableRow className="hover:bg-transparent">
           <TableHead className={RANK}>#</TableHead>
           <TableHead>Company</TableHead>
-          <TableHead className={NUM} aria-sort={ariaSort(sort, "importance")}>
-            <ImportanceHeader sort={sort} sortHref={sortHref("importance")} />
+          <TableHead className={NUM} aria-sort={ariaSort(sort, "quality")}>
+            <QualityHeader sort={sort} sortHref={sortHref("quality")} />
           </TableHead>
           <TableHead className={NUM} aria-sort={ariaSort(sort, "urgency")}>
             <UrgencyHeader sort={sort} sortHref={sortHref("urgency")} />
@@ -403,13 +403,13 @@ function PriorityTable({
                 </div>
               </TableCell>
               <TableCell className={cn(NUM, "text-base")}>
-                <ImportanceValue company={company} />
+                <QualityValue company={company} />
               </TableCell>
               <TableCell className={cn(NUM, "text-base")}>
                 <UrgencyValue breakdown={line.urgency_breakdown} hot={line.urgency >= 80} />
               </TableCell>
               <TableCell className={cn(NUM, "text-base")}>
-                <TotalValue importance={line.score_percent} urgency={line.urgency} total={line.priority} />
+                <TotalValue quality={line.score_percent} urgency={line.urgency} total={line.priority} />
               </TableCell>
               <TableCell className="text-center">
                 <ScoreHint

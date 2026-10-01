@@ -2,7 +2,7 @@
 
 /**
  * The two scores with their explanation on hover: the Urgency Score with its reason, the
- * Importance Score with its Fathom breakdown, and both column headers with the rule.
+ * Quality Score with its Fathom breakdown, and both column headers with the rule.
  */
 
 import { ArrowDown, ArrowUp, ArrowUpDown, Info } from "lucide-react";
@@ -66,8 +66,8 @@ export function UrgencyValue({ breakdown, hot = false }: { breakdown: UrgencyBre
   );
 }
 
-/** The Importance Score (Fathom rating) with its breakdown on hover, one dimension per line. */
-export function ImportanceValue({ company }: { company: object }) {
+/** The Quality Score (Fathom rating) with its breakdown on hover, one dimension per line. */
+export function QualityValue({ company }: { company: object }) {
   const { fathom } = loadTriageConfig();
   const ratings = ratingsOf(company);
   const rated = ratedCount(company);
@@ -80,17 +80,17 @@ export function ImportanceValue({ company }: { company: object }) {
   };
   if (!rated) {
     return (
-      <span className="text-muted-foreground" aria-label="Importance Score: not rated yet">
+      <span className="text-muted-foreground" aria-label="Quality Score: not rated yet">
         –
       </span>
     );
   }
   return (
     <ScoreHint
-      label={`Importance Score ${pyFixed(score, 0)}: ${band}`}
+      label={`Quality Score ${pyFixed(score, 0)} %: ${band}`}
       className="cursor-help underline decoration-muted-foreground/40 decoration-dotted underline-offset-4"
       contentClassName="w-80"
-      trigger={pyFixed(score, 0)}
+      trigger={`${pyFixed(score, 0)} %`}
     >
       <div className="mb-1.5 font-semibold">
         {pyFixed(score, 1)} % · {band}
@@ -112,7 +112,7 @@ export function ImportanceValue({ company }: { company: object }) {
           ))}
           <tr className="border-t border-border">
             <td className="pt-1 font-semibold" colSpan={2}>
-              Importance Score
+              Quality Score
             </td>
             <td className="pt-1 text-right font-semibold">{pyFixed(score, 1)}</td>
           </tr>
@@ -155,7 +155,7 @@ function ScoreHeader({
           scroll={false}
           aria-label={`Sort by ${label}${active ? (sort.direction === "asc" ? ", now ascending" : ", now descending") : ""}`}
         >
-          {/* Two lines ("Importance" over "Score") keep the number columns narrow. */}
+          {/* Two lines ("Quality" over "Score") keep the number columns narrow. */}
           <span className="flex flex-col items-end leading-tight">
             <span>{label.split(" ")[0]}</span>
             <span className="text-xs font-normal text-muted-foreground">{label.split(" ").slice(1).join(" ")}</span>
@@ -179,18 +179,18 @@ function ScoreHeader({
   );
 }
 
-export function ImportanceHeader({ sort, sortHref }: { sort: SortState; sortHref: string }) {
+export function QualityHeader({ sort, sortHref }: { sort: SortState; sortHref: string }) {
   const { fathom } = loadTriageConfig();
   const weights = FATHOM_DIMENSIONS.map((dimension) => `${dimension.label} ${fathom.weights[dimension.key]} %`).join(
     ", ",
   );
   return (
     <ScoreHeader
-      label="Importance Score"
-      column="importance"
+      label="Quality Score"
+      column="quality"
       sort={sort}
       sortHref={sortHref}
-      infoHref="/scoring#importance"
+      infoHref="/scoring#quality"
       info={`The Fathom rating: ten dimensions, each rated 1–${fathom.scale_max} and weighted (${weights}). Score = sum of weight × rating / ${fathom.scale_max}, plus up to ${fathom.storytelling_bonus_max} storytelling bonus points, capped at 100.`}
     />
   );
@@ -217,21 +217,21 @@ export function TotalHeader({ sort, sortHref }: { sort: SortState; sortHref: str
       sort={sort}
       sortHref={sortHref}
       infoHref="/scoring#priority"
-      info="Importance Score × Urgency Score / 100: the priority every worklist is ordered by. A deal that is both strong and pressing scores highest."
+      info="Quality Score × Urgency Score / 100: the priority every worklist is ordered by. A deal that is both strong and pressing scores highest."
     />
   );
 }
 
 /** The Total Score (priority) with its calculation on hover. */
-export function TotalValue({ importance, urgency, total }: { importance: number; urgency: number; total: number }) {
-  const text = `${importance} × ${urgency} / 100 = ${pyFixed(total, 1)}`;
+export function TotalValue({ quality, urgency, total }: { quality: number; urgency: number; total: number }) {
+  const text = `${quality} % × ${urgency} / 100 = ${pyFixed(total, 1)}`;
   return (
     <ScoreHint
       label={`Total Score ${pyFixed(total, 1)}: ${text}`}
       className="cursor-help font-semibold underline decoration-muted-foreground/40 decoration-dotted underline-offset-4"
       trigger={pyFixed(total, 1)}
     >
-      Importance Score × Urgency Score / 100
+      Quality Score × Urgency Score / 100
       <br />
       {text}
     </ScoreHint>

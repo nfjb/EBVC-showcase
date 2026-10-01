@@ -104,7 +104,7 @@ export default function DealDetailPage() {
         <Metric label="Decision" value={label(DECISION_LABELS, company.status)} />
         <RankMetric />
         <Metric
-          label="Importance Score"
+          label="Quality Score"
           value={
             <span className="flex flex-col">
               {pyFixed(company.score, 1)} %
@@ -162,9 +162,9 @@ export default function DealDetailPage() {
         />
 
         <div className="space-y-8">
-          <section aria-labelledby="importance-breakdown">
-            <h3 id="importance-breakdown" className="mb-2 text-base font-semibold">
-              Importance Score · {pyFixed(company.score, 1)} %
+          <section aria-labelledby="quality-breakdown">
+            <h3 id="quality-breakdown" className="mb-2 text-base font-semibold">
+              Quality Score · {pyFixed(company.score, 1)} %
             </h3>
             {breakdown.length ? (
               <DataTable>
@@ -188,7 +188,7 @@ export default function DealDetailPage() {
                     </TableRow>
                   ))}
                   <TableRow className="font-semibold hover:bg-transparent">
-                    <TableCell>Importance Score</TableCell>
+                    <TableCell>Quality Score</TableCell>
                     <TableCell />
                     <TableCell className={NUM}>100 %</TableCell>
                     <TableCell className={NUM}>{pyFixed(company.score, 1)}</TableCell>

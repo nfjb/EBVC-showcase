@@ -1,7 +1,7 @@
 /**
  * Urgency, cockpit priority, open tasks and the next action for a company.
  *
- * priority = Importance Score × Urgency Score / 100. The Urgency Score comes from five
+ * priority = Quality Score × Urgency Score / 100. The Urgency Score comes from five
  * dimensions (reply obligation, relationship, activity signal, competitive pressure, founder
  * momentum) and never from days in queue: waiting longer only raises the 14/21-day flag
  * (user decision 2026-09-30).

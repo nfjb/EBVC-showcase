@@ -1,5 +1,5 @@
 /**
- * Urgency and cockpit priority (user decision 2026-09-30: Importance × Urgency, and urgency
+ * Urgency and cockpit priority (user decision 2026-09-30: Quality × Urgency, and urgency
  * never comes from time in queue). The Urgency Score follows the LP scoring matrix: five
  * dimensions, a raw sum out of 120, normalised to 0–100.
  */
