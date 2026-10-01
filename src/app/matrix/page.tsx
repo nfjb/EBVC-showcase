@@ -144,9 +144,10 @@ function MatrixBody({
       />
 
       <RememberDealList title={`Matrix: ${title}`} ids={shown.map((row) => row.company_id)} />
-      <p>
-        <strong>{title}</strong> · {shown.length} deals · highest priority first
-      </p>
+      <div className="mt-8 mb-3 flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+        <span className="text-sm text-muted-foreground">{shown.length} deals · highest priority first</span>
+      </div>
       <DataTable>
         <TableHeader>
           <TableRow>
