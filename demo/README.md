@@ -1,4 +1,19 @@
-# EB_Event — demo data
+# Demo data
 
-`sample_input.csv` matches the primary Upload model's non-file fields.
-Use it during `lex start` to run the MVP end-to-end without prep.
+Fictional deal flow for Skarv Ventures (spec §1). Company names are invented, websites use
+the reserved `.example` domain, and LPs, angels and funds are made up.
+
+- `inbound_records.csv`: 412 raw inbound records for about 300 companies over four
+  channels, with duplicate spellings and 25 warm intros (including the Robotix AI showcase:
+  website form in June, two partner emails in July, an LP intro in August, LinkedIn last
+  week).
+- `signals.csv`: the enrichment mock (dated hires, traction, news and announced rounds).
+
+Load both with `npm run demo:load`, or upload them on **Deal flow uploads**.
+
+To regenerate them (reproducible, fixed seed):
+
+```bash
+pip install faker
+python demo/_generate.py
+```

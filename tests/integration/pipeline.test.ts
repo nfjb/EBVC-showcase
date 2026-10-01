@@ -1,0 +1,169 @@
+/**
+ * The pipeline over the generated demo files, and the human actions (spec §1–§5, §8).
+ *
+ * Every test starts from a fresh CRM. Expected figures come from the spec (412 raw records,
+ * 25 warm intros, the Robotix showcase with five arrivals), not from the pipeline's output.
+ */
+
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { getDb } from "@/lib/db/connection";
+import * as repo from "@/lib/db/repository";
+import { runPipeline, type PipelineCounts } from "@/lib/server/pipeline";
+import {
+  advance,
+  approveMerge,
+  overrideRank,
+  passDeal,
+  rankWorklist,
+  rejectMerge,
+  saveRatings,
+  setIntroStatus,
+} from "@/lib/server/triageActions";
+import { ActionRefused } from "@/lib/triage/errors";
+import { OUTSIDE_GEOGRAPHY, OUTSIDE_STAGE, TICKET_MISMATCH } from "@/lib/triage/filters";
+
+import { count, demoTexts, getCompanyOrThrow, loadDemo, robotix } from "./helpers";
+
+const PERSON = "Astrid Holm";
+let counts: PipelineCounts;
+
+beforeEach(() => {
+  counts = loadDemo();
+});
+
+describe("pipeline", () => {
+  it("keeps every raw record as a touchpoint", () => {
+    expect(counts.raw_records).toBe(412);
+    expect(count("SELECT COUNT(*) AS n FROM touchpoint")).toBe(412);
+    expect(count("SELECT COUNT(*) AS n FROM touchpoint WHERE channel = 'warm_intro'")).toBe(25);
+  });
+
+  it("makes the Robotix showcase one company with its full history", () => {
+    const company = robotix();
+    const history = repo.touchpointsOf(company.id);
+    expect(company.touchpoint_count).toBe(5);
+    expect(history.map((touchpoint) => touchpoint.channel)).toEqual([
+      "website_form",
+      "cold_email",
+      "cold_email",
+      "warm_intro",
+      "linkedin",
+    ]);
+    expect(history[0].received_at).toBe("2026-06-09");
+    expect(new Set([history[1].recipient, history[2].recipient])).toEqual(new Set(["Astrid Holm", "Jonas Weber"]));
+    expect(history[3].introducer_type).toBe("LP");
+    expect(company.passed_hard_filters).toBe(true);
+  });
+
+  it("gives failing companies a hard-filter pass code", () => {
+    const failing = repo.listCompanies().filter((company) => !company.passed_hard_filters);
+    expect(failing.length).toBeGreaterThan(0);
+    for (const company of failing) {
+      expect([OUTSIDE_STAGE, OUTSIDE_GEOGRAPHY, TICKET_MISMATCH]).toContain(company.pass_code);
+    }
+    expect(repo.listCompanies().filter((company) => company.passed_hard_filters && company.pass_code)).toEqual([]);
+  });
+
+  it("never rates team or market and writes no decisions", () => {
+    expect(count("SELECT COUNT(*) AS n FROM company WHERE team IS NOT NULL")).toBe(0);
+    expect(count("SELECT COUNT(*) AS n FROM company WHERE market IS NOT NULL")).toBe(0);
+    expect(count("SELECT COUNT(*) AS n FROM company WHERE thesis_fit_confirmed = 1")).toBe(0);
+    expect(count("SELECT COUNT(*) AS n FROM decision")).toBe(0);
+  });
+
+  it("leaves suggested merges waiting for a person", () => {
+    expect(counts.suggested_merges).toBeGreaterThan(0);
+    expect(repo.countCompanies()).toBe(counts.companies);
+    expect(new Set(repo.listMergeSuggestions().map((suggestion) => suggestion.status))).toEqual(new Set(["pending"]));
+  });
+});
+
+describe("human actions", () => {
+  it("moves touchpoints and logs an approved merge", () => {
+    const suggestion = repo.listMergeSuggestions()[0];
+    const expected =
+      repo.touchpointsOf(suggestion.company_id).length + repo.touchpointsOf(suggestion.candidate_id).length;
+    approveMerge(suggestion.id, PERSON);
+    expect(getCompanyOrThrow(suggestion.company_id).touchpoint_count).toBe(expected);
+    expect(repo.getCompany(suggestion.candidate_id)).toBeNull();
+    const decisions = repo.listDecisions().filter((decision) => decision.decision === "merge_approved");
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0].decided_by).toBe(PERSON);
+    expect(decisions[0].company_id).toBe(suggestion.company_id);
+  });
+
+  it("keeps both companies when a merge is rejected", () => {
+    const suggestion = repo.listMergeSuggestions()[0];
+    rejectMerge(suggestion.id, PERSON);
+    expect(repo.getCompany(suggestion.candidate_id)).not.toBeNull();
+    expect(count("SELECT COUNT(*) AS n FROM decision WHERE decision = 'merge_rejected'")).toBe(1);
+  });
+
+  it("refuses to decide the same merge twice", () => {
+    const suggestion = repo.listMergeSuggestions()[0];
+    rejectMerge(suggestion.id, PERSON);
+    expect(() => approveMerge(suggestion.id, PERSON)).toThrow(ActionRefused);
+    expect(count("SELECT COUNT(*) AS n FROM decision")).toBe(1);
+  });
+
+  it("logs advance and pass with who and pass code", () => {
+    const open = repo.listCompanies().filter((company) => company.passed_hard_filters && company.status === "open");
+    advance(open[0].id, PERSON, "Strong fit");
+    passDeal(open[1].id, "market_too_small", PERSON);
+    const logged = Object.fromEntries(repo.listDecisions().map((decision) => [decision.decision, decision]));
+    expect(logged.advance.decided_by).toBe(PERSON);
+    expect(logged.pass.pass_code).toBe("market_too_small");
+    expect(logged.pass.decided_at).toBeTruthy();
+  });
+
+  it("requires a comment for pass code other", () => {
+    expect(() => passDeal(robotix().id, "other", PERSON, " ")).toThrow(ActionRefused);
+  });
+
+  it("requires a comment for a rank override, and pins the position", () => {
+    expect(() => overrideRank(robotix().id, 1, "", PERSON)).toThrow(ActionRefused);
+    overrideRank(robotix().id, 1, "Partner meeting asked to see it first", PERSON);
+    const ranked = rankWorklist(repo.listCompaniesWithTouchpoints());
+    expect(ranked[0].id).toBe(robotix().id);
+    expect(count("SELECT COUNT(*) AS n FROM decision WHERE decision = 'rank_override'")).toBe(1);
+  });
+
+  it("rescores and logs human ratings", () => {
+    const before = robotix().score;
+    saveRatings(robotix().id, 3, 3, 2, PERSON);
+    const company = robotix();
+    expect(company.score).toBeGreaterThan(before);
+    expect(company.thesis_fit_confirmed).toBe(true);
+    expect(company.team).toBe(2);
+    expect(count("SELECT COUNT(*) AS n FROM decision WHERE decision = 'rating_changed'")).toBe(1);
+  });
+
+  it("saves nothing when the decision cannot be logged", () => {
+    const before = robotix();
+    expect(() => saveRatings(before.id, 3, 3, 2, "")).toThrow(ActionRefused);
+    expect(robotix()).toEqual(before);
+  });
+
+  it("logs an intro marked as replied", () => {
+    const intro = repo.touchpointsOf(robotix().id).find((touchpoint) => touchpoint.channel === "warm_intro")!;
+    setIntroStatus(intro.id, "replied", PERSON);
+    expect(repo.getTouchpoint(intro.id)!.intro_status).toBe("replied");
+    expect(count("SELECT COUNT(*) AS n FROM decision WHERE decision = 'intro_replied'")).toBe(1);
+  });
+
+  it("keeps the audit log through a re-upload", () => {
+    advance(robotix().id, PERSON);
+    runPipeline(...demoTexts());
+    const decision = repo.listDecisions().find((row) => row.decision === "advance")!;
+    expect(decision.company_id).toBeNull();
+    expect(decision.company_name).toBe("Robotix AI");
+  });
+
+  it("leaves the CRM untouched when an upload cannot be read", () => {
+    const before = repo.countCompanies();
+    expect(() => runPipeline("not,a,deal,flow\n1,2,3,4\n", demoTexts()[1])).toThrow(/missing column/);
+    expect(repo.countCompanies()).toBe(before);
+    expect(getDb().prepare("SELECT COUNT(*) AS n FROM touchpoint").get()).toEqual({ n: 412 });
+  });
+});
