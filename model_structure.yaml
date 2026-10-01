@@ -1,0 +1,34 @@
+# Sidebar navigation — see docs/lex_topics/10-process-admin-and-model-structure.md
+model_structure:
+  Inputs:
+    company: null
+    touchpoint: null
+    mergesuggestion: null
+    decision: null
+    outboxmessage: null
+  Uploads:
+    dealflowupload: null
+
+# Display names in the sidebar, for folders and for single models (key = lowercase
+# class name). Plain ASCII only: Lex reads this file with the system encoding.
+model_styling:
+  Inputs:
+    name: "Inputs"
+  Uploads:
+    name: "Uploads"
+  Reports:
+    name: "Reports"
+  company:
+    name: "Companies"
+  touchpoint:
+    name: "Touchpoints (inbound records)"
+  mergesuggestion:
+    name: "Merge suggestions"
+  decision:
+    name: "Decisions (audit log)"
+  outboxmessage:
+    name: "Outbox (simulated replies)"
+  dealflowupload:
+    name: "Deal flow uploads"
+
+untracked_models: {}

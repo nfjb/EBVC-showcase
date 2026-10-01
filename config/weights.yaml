@@ -1,0 +1,77 @@
+# Skarv Ventures deal-flow triage — the one visible scoring and rules config.
+# Every number the pipeline uses to filter, score or flag a deal lives here.
+
+# The demo's fixed "today" (spec: treat today as 2026-09-30).
+demo_today: 2026-09-30
+
+# Score = sum(weight × component). Components are 1–3 (momentum 0–3).
+# market and team are human-only: empty until a person rates them, and an empty
+# rating adds nothing. team is never filled automatically.
+weights:
+  thesis_fit: 2.0
+  market: 1.5
+  team: 1.5
+  momentum: 1.0
+  source_quality: 1.0
+
+# source_quality component per inbound channel (warm intro > cold).
+source_quality:
+  warm_intro: 3
+  linkedin: 1
+  cold_email: 1
+  website_form: 1
+
+# Momentum = number of hire / traction / news signals known at intake, capped.
+momentum_cap: 3
+
+hard_filters:
+  stages: [Pre-Seed, Seed]
+  countries:
+    # Quoted: unquoted NO is read by YAML as false ("the Norway problem").
+    nordics: ["DK", "SE", "NO", "FI", "IS"]
+    dach: ["DE", "AT", "CH"]
+  # Implied Skarv ticket = round_size_eur × implied_ticket_share (user decision
+  # 2026-09-30: 40% of the round), and must fall within the fund's ticket range.
+  implied_ticket_share: 0.4
+  ticket_min_eur: 500000
+  ticket_max_eur: 2000000
+
+# Time in queue never changes the score; it only raises these flags.
+queue_flags:
+  decide_this_week_days: 14
+  decision_required_days: 21
+
+# Warm intros must get a reply within this many working days (weekends skipped).
+intro_reply_working_days: 3
+
+# Fuzzy company-name match threshold (Jaro-Winkler) for a suggested merge.
+suggested_merge_similarity: 0.92
+
+worklist_size: 20
+
+# Urgency (0-100) orders the cockpit together with the score: priority = score % x urgency.
+# It comes only from obligations and news, never from days in queue (user decision
+# 2026-09-30): an open warm intro sets it by its reply-deadline stage; otherwise the base
+# value plus a bonus for a recent signal.
+urgency:
+  base: 30
+  intro_overdue: 95
+  intro_due_today: 90
+  intro_reminder: 80
+  intro_open: 70
+  recent_signal_days: 14
+  recent_signal_bonus: 25
+  signal_days: 45
+  signal_bonus: 15
+
+# Cockpit quick filters.
+cockpit:
+  new_startup_days: 7
+  long_tracking_days: 90
+
+# Priority matrix: where the quadrant lines sit (score % and urgency, both 0-100).
+# Score split 30 sits near the upper quartile of filter-passing deals in the demo data;
+# urgency 60 separates open warm-intro obligations (70+) from the rest.
+matrix:
+  score_split: 30
+  urgency_split: 60

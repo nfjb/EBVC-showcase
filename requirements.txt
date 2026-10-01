@@ -1,0 +1,8 @@
+# Runtime: Django and Streamlit come transitively with lex-app.
+lex-app==2.2.0
+PyYAML==6.0.3             # imported by the framework (model_structure) and used for lex_test_config.yaml
+psycopg2-binary==2.9.12   # PostgreSQL driver
+
+# Dev / test toolchain (tests run through `python -m lex pytest`).
+pytest==9.1.1
+ruff==0.15.22

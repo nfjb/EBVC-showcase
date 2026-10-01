@@ -1,0 +1,31 @@
+# Skarv Ventures team (fictional). responsible_partner is who a warm intro escalates to
+# on day 3 when its owner has not replied.
+team:
+  - name: Astrid Holm
+    role: partner
+    office: Copenhagen
+    responsible_partner: Astrid Holm
+  - name: Jonas Weber
+    role: partner
+    office: Berlin
+    responsible_partner: Jonas Weber
+  - name: Mette Lund
+    role: partner
+    office: Copenhagen
+    responsible_partner: Mette Lund
+  - name: Lukas Brandt
+    role: principal
+    office: Berlin
+    responsible_partner: Jonas Weber
+  - name: Sofie Nygaard
+    role: principal
+    office: Copenhagen
+    responsible_partner: Astrid Holm
+  - name: Emil Karlsson
+    role: associate
+    office: Copenhagen
+    responsible_partner: Mette Lund
+  - name: Lea Hoffmann
+    role: associate
+    office: Berlin
+    responsible_partner: Jonas Weber

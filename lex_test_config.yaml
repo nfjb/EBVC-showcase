@@ -1,0 +1,11 @@
+# Lex test configuration for `python -m lex pytest`.
+tests_entrypoint: Tests
+
+report:
+  output_dir: reports
+
+groups:
+  - name: unit
+    description: Pure logic — normalisation, match rules, hard filters, scoring, working-day SLA.
+  - name: integration
+    description: Database — the pipeline over the demo files and the human actions with their audit log.
