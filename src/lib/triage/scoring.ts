@@ -1,5 +1,5 @@
 /**
- * Company scoring on the O1 Venture investment criteria (Pre-Seed / Seed, March 2026), with
+ * Company scoring on the Fathom investment criteria, with
  * visible weights and a per-deal breakdown (spec §4).
  *
  * Only companies are scored. Every dimension is a human rating (1–5): the pipeline never
@@ -7,11 +7,11 @@
  * score — it only raises the 14/21-day flags in {@link queueFlag}.
  */
 
-import type { O1Rules } from "./config";
+import type { FathomRules } from "./config";
 import { pyRound } from "./py";
 
-/** The ten O1 dimensions in the framework's order, with what a person assesses for each. */
-export const O1_DIMENSIONS = [
+/** The ten Fathom dimensions in the framework's order, with what a person assesses for each. */
+export const FATHOM_DIMENSIONS = [
   {
     key: "team",
     label: "Team",
@@ -64,18 +64,18 @@ export const O1_DIMENSIONS = [
   },
 ] as const;
 
-export type O1Dimension = (typeof O1_DIMENSIONS)[number]["key"];
-export const O1_KEYS: O1Dimension[] = O1_DIMENSIONS.map((dimension) => dimension.key);
+export type FathomDimension = (typeof FATHOM_DIMENSIONS)[number]["key"];
+export const FATHOM_KEYS: FathomDimension[] = FATHOM_DIMENSIONS.map((dimension) => dimension.key);
 export const STORYTELLING = "storytelling_bonus";
 
 /** One rating per dimension (1–5, or null until a person rates it) plus the 0–5 bonus. */
-export type O1Ratings = Record<O1Dimension, number | null> & { storytelling_bonus: number | null };
+export type FathomRatings = Record<FathomDimension, number | null> & { storytelling_bonus: number | null };
 
 export const DECIDE_THIS_WEEK = "Decide this week";
 export const DECISION_REQUIRED = "Decision required at next meeting";
 
 export interface BreakdownRow {
-  component: O1Dimension | typeof STORYTELLING;
+  component: FathomDimension | typeof STORYTELLING;
   value: number | null;
   /** Weight in % (0 for the storytelling bonus). */
   weight: number;
@@ -84,15 +84,15 @@ export interface BreakdownRow {
   note: string;
 }
 
-export function emptyRatings(): O1Ratings {
-  return { ...(Object.fromEntries(O1_KEYS.map((key) => [key, null])) as Record<O1Dimension, null>), storytelling_bonus: null };
+export function emptyRatings(): FathomRatings {
+  return { ...(Object.fromEntries(FATHOM_KEYS.map((key) => [key, null])) as Record<FathomDimension, null>), storytelling_bonus: null };
 }
 
 /** The ratings stored on a company row (other fields are ignored). */
-export function ratingsOf(company: object): O1Ratings {
+export function ratingsOf(company: object): FathomRatings {
   const fields = company as Record<string, unknown>;
   const ratings = emptyRatings();
-  for (const key of [...O1_KEYS, STORYTELLING] as const) {
+  for (const key of [...FATHOM_KEYS, STORYTELLING] as const) {
     const value = fields[key];
     ratings[key] = value === null || value === undefined ? null : Number(value);
   }
@@ -101,29 +101,29 @@ export function ratingsOf(company: object): O1Ratings {
 
 export function ratedCount(company: object): number {
   const ratings = ratingsOf(company);
-  return O1_KEYS.filter((key) => ratings[key] !== null).length;
+  return FATHOM_KEYS.filter((key) => ratings[key] !== null).length;
 }
 
-function checkWeights(rules: O1Rules): void {
-  for (const key of O1_KEYS) {
-    if (!(key in rules.weights)) throw new Error(`Missing O1 weight for ${key} in config/weights.yaml`);
+function checkWeights(rules: FathomRules): void {
+  for (const key of FATHOM_KEYS) {
+    if (!(key in rules.weights)) throw new Error(`Missing Fathom weight for ${key} in config/weights.yaml`);
   }
-  const total = O1_KEYS.reduce((sum, key) => sum + Number(rules.weights[key]), 0);
-  if (pyRound(total, 6) !== 100) throw new Error(`O1 weights in config/weights.yaml add up to ${total}, not 100`);
+  const total = FATHOM_KEYS.reduce((sum, key) => sum + Number(rules.weights[key]), 0);
+  if (pyRound(total, 6) !== 100) throw new Error(`Fathom weights in config/weights.yaml add up to ${total}, not 100`);
 }
 
 /**
- * Return ``[score %, breakdown]``. Reads only the ten O1 ratings and the storytelling bonus.
+ * Return ``[score %, breakdown]``. Reads only the ten Fathom ratings and the storytelling bonus.
  *
  * ``components`` may carry any other company fields (days in queue, dates…); they are
  * ignored, which is what keeps time in queue out of the score.
  */
-export function scoreCompany(components: object, rules: O1Rules): [number, BreakdownRow[]] {
+export function scoreCompany(components: object, rules: FathomRules): [number, BreakdownRow[]] {
   checkWeights(rules);
   const ratings = ratingsOf(components);
   const breakdown: BreakdownRow[] = [];
   let total = 0;
-  for (const key of O1_KEYS) {
+  for (const key of FATHOM_KEYS) {
     const value = ratings[key];
     const weight = Number(rules.weights[key]);
     const points = value === null ? 0 : (weight * value) / rules.scale_max;
@@ -142,9 +142,9 @@ export function scoreCompany(components: object, rules: O1Rules): [number, Break
   return [pyRound(Math.min(total, 100), 1), breakdown];
 }
 
-/** The O1 interpretation of a score, or a provisional note while dimensions are unrated. */
-export function scoreBand(score: number, rated: number, rules: O1Rules): string {
-  if (rated < O1_KEYS.length) return `Provisional – ${rated} of ${O1_KEYS.length} rated`;
+/** The Fathom interpretation of a score, or a provisional note while dimensions are unrated. */
+export function scoreBand(score: number, rated: number, rules: FathomRules): string {
+  if (rated < FATHOM_KEYS.length) return `Provisional – ${rated} of ${FATHOM_KEYS.length} rated`;
   return rules.bands.find((band) => score >= band.min)?.label ?? rules.bands[rules.bands.length - 1].label;
 }
 

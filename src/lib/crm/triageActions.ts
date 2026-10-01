@@ -14,12 +14,12 @@ import { PASS_CODES } from "@/lib/triage/drafts";
 import { ActionRefused } from "@/lib/triage/errors";
 import { pyFixed, pyStrip } from "@/lib/triage/py";
 import {
-  O1_DIMENSIONS,
-  O1_KEYS,
+  FATHOM_DIMENSIONS,
+  FATHOM_KEYS,
   ratingsOf,
   scoreCompany,
   STORYTELLING,
-  type O1Ratings,
+  type FathomRatings,
 } from "@/lib/triage/scoring";
 import type { Company, CompanyWithTouchpoints, MergeSuggestion } from "@/lib/triage/types";
 import { buildLine, rankByPriority } from "@/lib/triage/urgency";
@@ -56,9 +56,9 @@ export function logDecision(
   });
 }
 
-/** Recompute score and breakdown from the stored O1 ratings (never from queue time). */
+/** Recompute score and breakdown from the stored Fathom ratings (never from queue time). */
 export function rescore(company: object): Pick<Company, "score" | "score_breakdown"> {
-  const [score, breakdown] = scoreCompany(ratingsOf(company), loadTriageConfig().o1);
+  const [score, breakdown] = scoreCompany(ratingsOf(company), loadTriageConfig().fathom);
   return { score, score_breakdown: JSON.stringify(breakdown) };
 }
 
@@ -69,25 +69,32 @@ function checkRating(value: number | null, label: string, low: number, high: num
 }
 
 /**
- * A person rates the company on the O1 criteria (1–5 per dimension, 0–5 storytelling bonus).
+ * A person rates the company on the Fathom criteria (1–5 per dimension, 0–5 storytelling bonus).
  * These are the only writes of the ratings: the pipeline never fills them.
  */
-export function saveRatings(companyId: number, ratings: O1Ratings, decidedBy: string): void {
-  const { o1 } = loadTriageConfig();
-  for (const dimension of O1_DIMENSIONS) checkRating(ratings[dimension.key] ?? null, dimension.label, 1, o1.scale_max);
-  checkRating(ratings.storytelling_bonus ?? null, "Storytelling bonus", 0, o1.storytelling_bonus_max);
+export function saveRatings(companyId: number, ratings: FathomRatings, decidedBy: string): void {
+  const { fathom } = loadTriageConfig();
+  for (const dimension of FATHOM_DIMENSIONS) checkRating(ratings[dimension.key] ?? null, dimension.label, 1, fathom.scale_max);
+  checkRating(ratings.storytelling_bonus ?? null, "Storytelling bonus", 0, fathom.storytelling_bonus_max);
   const values = ratingsOf(ratings);
   atomic(() => {
     const company = requireCompany(companyId);
     const scored = rescore(values);
-    repo.updateCompany(companyId, { ...values, ...scored });
-    const summary = O1_DIMENSIONS.map((dimension) => `${dimension.label.toLowerCase()} ${values[dimension.key] ?? "-"}`);
+    // A person's ratings: the agent never overwrites them. Its rationale is kept for reference.
+    repo.updateCompany(companyId, {
+      ...values,
+      ...scored,
+      rating_source: "person",
+      rated_by: decidedBy,
+      rated_at: now(),
+    });
+    const summary = FATHOM_DIMENSIONS.map((dimension) => `${dimension.label.toLowerCase()} ${values[dimension.key] ?? "-"}`);
     logDecision(
       company,
       "rating_changed",
       decidedBy,
       "",
-      `O1 ${pyFixed(scored.score, 1)} %: ${summary.join(", ")}, storytelling bonus ${values.storytelling_bonus ?? "-"}`,
+      `Fathom ${pyFixed(scored.score, 1)} %: ${summary.join(", ")}, storytelling bonus ${values.storytelling_bonus ?? "-"}`,
     );
   });
 }
@@ -151,11 +158,19 @@ export function approveMerge(suggestionId: number, decidedBy: string): void {
     );
     repo.moveTouchpoints(candidate.id, company.id);
     const touchpoints = repo.touchpointsOf(company.id);
-    // A person's ratings are kept: where the surviving company is unrated, the merged one's count.
-    const kept = ratingsOf(company);
-    const theirs = ratingsOf(candidate);
-    for (const key of [...O1_KEYS, STORYTELLING] as const) kept[key] = kept[key] ?? theirs[key];
+    // Ratings follow who set them: a person's beat the agent's, which beat none; gaps are
+    // filled from the other company, so no person's rating is lost in a merge.
+    const rank = (source: string) => (source === "person" ? 2 : source === "agent" ? 1 : 0);
+    const [lead, other] = rank(candidate.rating_source) > rank(company.rating_source) ? [candidate, company] : [company, candidate];
+    const kept = ratingsOf(lead);
+    const theirs = ratingsOf(other);
+    for (const key of [...FATHOM_KEYS, STORYTELLING] as const) kept[key] = kept[key] ?? theirs[key];
     repo.updateCompany(company.id, {
+      rating_source: lead.rating_source,
+      rating_rationale: lead.rating_rationale || other.rating_rationale,
+      rating_model: lead.rating_model,
+      rated_by: lead.rated_by,
+      rated_at: lead.rated_at,
       touchpoint_count: touchpoints.length,
       first_seen_at: touchpoints.reduce(
         (first, touchpoint) => (touchpoint.received_at < first ? touchpoint.received_at : first),

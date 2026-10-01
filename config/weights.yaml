@@ -4,11 +4,11 @@
 # The demo's fixed "today" (spec: treat today as 2026-09-30).
 demo_today: 2026-09-30
 
-# Score = the O1 Venture investment criteria (Pre-Seed / Seed, March 2026).
+# Score = the Fathom investment criteria.
 # A person rates each dimension 1 (weak) to 5 (strong); the pipeline never fills them.
 # Score % = sum(weight × rating / scale_max); unrated dimensions add nothing.
 # The weights are percentages and must add up to 100.
-o1:
+fathom:
   scale_max: 5
   weights:
     team: 20
@@ -77,8 +77,8 @@ cockpit:
   new_startup_days: 7
   long_tracking_days: 90
 
-# Priority matrix: where the quadrant lines sit (O1 score % and urgency, both 0-100).
-# Score split 60 is the O1 watchlist line; urgency 60 separates open warm-intro
+# Priority matrix: where the quadrant lines sit (Fathom score % and urgency, both 0-100).
+# Score split 60 is the Fathom watchlist line; urgency 60 separates open warm-intro
 # obligations (70+) from the rest.
 matrix:
   score_split: 60

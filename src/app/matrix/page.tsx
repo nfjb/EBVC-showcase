@@ -8,18 +8,23 @@
  */
 
 import Link from "next/link";
+import type { CSSProperties } from "react";
 
 import { NavigateSelect } from "@/components/CockpitClient";
 import { RememberDealList } from "@/components/dealList";
-import { Caption, DataTable, Display, Eyebrow, Lede, Notice, NUM } from "@/components/page";
+import { HeaderActions } from "@/components/HeaderActions";
+import { Caption, DataTable, Notice, NUM, PageHeader } from "@/components/page";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { MatrixChart } from "@/components/MatrixChart";
+import { MatrixChart, QUADRANT_COLOURS } from "@/components/MatrixChart";
 import { useCrm, useSearchRecord } from "@/components/useCrm";
 import { dealHref, withQuery } from "@/lib/routes";
 import { cockpitLines } from "@/lib/crm/views";
 import { byPriority, byPriorityThenScore, matrixRows, QUADRANT_ORDER } from "@/lib/triage/cockpit";
 import { demoToday, loadTriageConfig, teamNames } from "@/lib/triage/config";
 import { QUADRANTS, rankByPriority, type QuadrantKey } from "@/lib/triage/urgency";
+import { ratedCount } from "@/lib/triage/scoring";
+import { cn } from "@/lib/utils";
 
 function one(value: string | undefined): string {
   return value ?? "";
@@ -46,20 +51,24 @@ export default function MatrixPage() {
 
   return (
     <>
-      <Eyebrow>Score × urgency</Eyebrow>
-      <Display>Priority matrix</Display>
-      <Lede>
-        Every open deal that passed the hard filters, placed by O1 score and urgency. Deals nobody has rated yet sit
-        at 0 %. Time in queue is not part of either axis.
-      </Lede>
-      <NavigateSelect
-        label="Deals owned by"
-        value={owner}
-        options={[WHOLE_TEAM, ...team]}
-        hrefFor={Object.fromEntries(
-          [WHOLE_TEAM, ...team].map((name) => [name, withQuery("/matrix", { owner: name === WHOLE_TEAM ? null : name, q: selected })]),
-        )}
+      <PageHeader
+        title="Priority matrix"
+        eyebrow="Importance Score × Urgency Score"
+        description="Every open deal that passed the hard filters, placed by Importance Score (the Fathom rating) and Urgency Score. Deals nobody has rated yet sit at 0 %. Time in queue is not part of either axis."
       />
+      <HeaderActions>
+        <NavigateSelect
+          label="Deals owned by"
+          value={owner}
+          options={[WHOLE_TEAM, ...team]}
+          hrefFor={Object.fromEntries(
+            [WHOLE_TEAM, ...team].map((name) => [
+              name,
+              withQuery("/matrix", { owner: name === WHOLE_TEAM ? null : name, q: selected }),
+            ]),
+          )}
+        />
+      </HeaderActions>
       {!rows.length ? (
         <Notice tone="info">No open deals for this owner.</Notice>
       ) : (
@@ -84,50 +93,48 @@ function MatrixBody({
 }) {
   const shown = byPriorityThenScore(selected ? rows.filter((row) => row.quadrant_key === selected) : rows);
   const title = selected ? QUADRANTS[selected][0] : "All deals on the matrix";
-  const topIds = rankByPriority(lines)
-    .slice(0, 6)
+  // Label the six highest-priority deals that have a score; unrated ones all sit on the 0 % line.
+  const topIds = rankByPriority(lines.filter((line) => ratedCount(line.company)))
+    .slice(0, 12)
     .map((line) => line.company.id);
   return (
     <>
-      <div className="my-3.5 grid gap-3 md:grid-cols-2">
+      <div className="mb-4 grid gap-3 md:grid-cols-2">
         {TILE_LAYOUT.map((key) => {
           const [name, help] = QUADRANTS[key];
           const count = rows.filter((row) => row.quadrant_key === key).length;
           return (
             <Link
               key={key}
-              className="group/quad flex min-h-23 items-start gap-3 rounded-lg border bg-card px-3.5 py-3 no-underline transition-colors hover:border-foreground aria-[current=true]:border-foreground aria-[current=true]:bg-foreground"
+              className="rounded-xl no-underline"
               href={withQuery("/matrix", { owner: ownerParam, q: selected === key ? null : key })}
               aria-current={selected === key ? "true" : undefined}
               aria-label={`Show ${name} (${count})`}
             >
-              <span className="min-w-11 font-display text-[38px] leading-none text-primary group-aria-[current=true]/quad:text-[#ff6b81]">
-                {count}
-              </span>
-              <span>
-                <span className="block font-bold text-foreground group-aria-[current=true]/quad:text-background">
-                  {name}
-                </span>
-                <span className="mt-0.5 block text-[13.5px] leading-snug text-muted-foreground group-aria-[current=true]/quad:text-background">
-                  {help}
-                </span>
-              </span>
+              <Card
+                className={cn(
+                  "relative h-full gap-1 overflow-hidden py-3 pl-1 transition-shadow hover:shadow-md",
+                  selected === key && "ring-2 ring-(--quadrant)",
+                )}
+                style={{ "--quadrant": QUADRANT_COLOURS[key] } as CSSProperties}
+              >
+                <span className="absolute inset-y-0 left-0 w-1 bg-(--quadrant)" aria-hidden="true" />
+                <CardHeader className="px-4">
+                  <CardDescription className="flex items-center justify-between gap-2 font-medium text-foreground">
+                    {name}
+                    {selected === key ? (
+                      <span className="text-xs font-normal text-muted-foreground">Selected · click to clear</span>
+                    ) : null}
+                  </CardDescription>
+                  <CardTitle className="text-3xl font-semibold text-(--quadrant) tabular-nums">{count}</CardTitle>
+                  <CardDescription>{help}</CardDescription>
+                </CardHeader>
+              </Card>
             </Link>
           );
         })}
       </div>
 
-      <div className="mt-1 mb-2 flex flex-wrap gap-4.5 text-sm text-foreground/90">
-        <span>
-          <span className="text-warm">▲</span> Warm intro
-        </span>
-        <span>
-          <span className="text-cold">●</span> Cold inbound
-        </span>
-        <span>Bubble size = touchpoints</span>
-        <span>Dashed lines = quadrant splits</span>
-        <span>Click a bubble to open the deal</span>
-      </div>
       <MatrixChart
         rows={rows}
         labelledIds={topIds}
@@ -135,10 +142,6 @@ function MatrixBody({
         dealHrefs={Object.fromEntries(rows.map((row) => [row.company_id, dealHref(row.company_id, currentHref)]))}
         priorityOrder={byPriority(rows).map((row) => row.company_id)}
       />
-      <Caption>
-        Points on the same value are spread slightly so none hide behind another; the tooltip shows the exact score and
-        urgency. The six highest-priority deals are labelled.
-      </Caption>
 
       <RememberDealList title={`Matrix: ${title}`} ids={shown.map((row) => row.company_id)} />
       <p>
@@ -148,8 +151,8 @@ function MatrixBody({
         <TableHeader>
           <TableRow>
             <TableHead>Company</TableHead>
-            <TableHead className={NUM}>O1 %</TableHead>
-            <TableHead className={NUM}>Urgency</TableHead>
+            <TableHead className={NUM}>Importance Score</TableHead>
+            <TableHead className={NUM}>Urgency Score</TableHead>
             <TableHead className={NUM}>Touch­points</TableHead>
             <TableHead>Source</TableHead>
             <TableHead>Next action</TableHead>

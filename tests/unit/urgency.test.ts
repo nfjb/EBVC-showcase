@@ -121,9 +121,9 @@ describe("urgency and priority", () => {
     ]);
   });
 
-  it("asks for the O1 rating while any dimension is unrated", () => {
+  it("asks for the Fathom rating while any dimension is unrated", () => {
     const line = buildLine(company("Unrated", { score: 0 }), TODAY);
-    expect(line.tasks).toContain("Rate the O1 criteria");
+    expect(line.tasks).toContain("Rate the Fathom criteria");
     expect(line.next_action).toBe("Rate the deal");
   });
 

@@ -6,7 +6,9 @@
  */
 
 import { MergeActions } from "@/components/MergeActions";
-import { Caption, Notice, PageTitle } from "@/components/page";
+import { CircleCheck } from "lucide-react";
+
+import { Caption, EmptyState, PageHeader } from "@/components/page";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useCrm, useSearchRecord } from "@/components/useCrm";
@@ -51,12 +53,18 @@ export default function MergeQueuePage() {
   const pending = repo.listMergeSuggestions("pending");
   return (
     <>
-      <PageTitle>Merge queue</PageTitle>
-      <Caption>
-        These companies have very similar names and no conflicting website. Nothing is merged until a person decides.
-      </Caption>
+      <PageHeader
+        title="Merge queue"
+        description={
+          <>
+            These companies have very similar names and no conflicting website. Nothing is merged until a person decides.
+          </>
+        }
+      />
       {!pending.length ? (
-        <Notice tone="success">No possible duplicates waiting.</Notice>
+        <EmptyState icon={CircleCheck} title="No possible duplicates waiting">
+          Fuzzy name matches appear here after an upload, until a person decides.
+        </EmptyState>
       ) : (
         <MergePair pending={pending} position={Math.max(0, Math.min(requested, pending.length - 1))} />
       )}

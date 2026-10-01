@@ -6,7 +6,9 @@
  */
 
 import { OutboxList } from "@/components/Filtered";
-import { Caption, Notice, PageTitle } from "@/components/page";
+import { Send } from "lucide-react";
+
+import { EmptyState, PageHeader } from "@/components/page";
 import { useCrm } from "@/components/useCrm";
 import * as repo from "@/lib/db/repository";
 import { formatShortTimestamp } from "@/lib/triage/dates";
@@ -17,13 +19,18 @@ export default function OutboxPage() {
   const messages = repo.listOutboxMessages();
   return (
     <>
-      <PageTitle>Outbox</PageTitle>
-      <Caption>
-        Every reply sent from the app. Sending is simulated: messages are stored here and in the audit log, and never
-        delivered.
-      </Caption>
+      <PageHeader
+        title="Outbox"
+        description={
+          <>
+            Every reply sent from the app. Sending is simulated: messages are stored here and in the audit log, and never delivered.
+          </>
+        }
+      />
       {!messages.length ? (
-        <Notice tone="info">Nothing sent yet. Reply to an intro in the Intro tracker, or pass on a deal.</Notice>
+        <EmptyState icon={Send} title="Nothing sent yet">
+          Reply to an intro in the Intro tracker, or pass on a deal.
+        </EmptyState>
       ) : (
         <OutboxList
           kindLabels={MESSAGE_KIND_LABELS}

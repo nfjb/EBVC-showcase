@@ -25,7 +25,7 @@ export interface Company {
   passed_hard_filters: boolean;
   /** Hard-filter failure or the pass code a person chose when passing the deal. */
   pass_code: string;
-  // The O1 ratings, 1–5 each, set only by a person (null until rated).
+  // The Fathom ratings, 1–5 each, set only by a person (null until rated).
   team: number | null;
   market: number | null;
   problem_solution_fit: number | null;
@@ -38,7 +38,16 @@ export interface Company {
   exit_potential: number | null;
   /** Storytelling & design: 0–5 bonus points on top of the score. */
   storytelling_bonus: number | null;
-  /** The O1 score in % (0–100). */
+  /** Who set the Fathom ratings: "agent" (the Fathom rating agent), "person", or "" (unrated). */
+  rating_source: "" | "agent" | "person" | string;
+  /** The agent's three-sentence justification (kept when a person changes the ratings). */
+  rating_rationale: string;
+  /** The AI model behind the agent's ratings, or "". */
+  rating_model: string;
+  /** Who last set the ratings ("Fathom agent" or "<name> (demo)"), and when (ISO, UTC). */
+  rated_by: string;
+  rated_at: string | null;
+  /** The Fathom score in % (0–100). */
   score: number;
   /** JSON list of {component, value, weight, points, note}. */
   score_breakdown: string;

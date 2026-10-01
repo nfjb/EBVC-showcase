@@ -67,6 +67,9 @@ NO, FI, IS; DACH: DE, AT, CH) and ticket fit (implied ticket within
 EUR 0.5–2m). Store the failing reason as a pass code.
 
 ## 4. Scoring (pipeline/scoring.py)
+*Changed 2026-10-01: the score is now the Fathom investment criteria (ten dimensions,
+1–5, weighted; see README "Scoring"), pre-rated by an AI agent and adjustable by people. The
+components below are the original brief.*
 Score companies only, never individuals. Components with weights defined
 in one visible config file (config/weights.yaml):
 - thesis_fit (1–3): AI-suggested from deck_text against a short written
@@ -105,6 +108,9 @@ Keep one template library so tone is consistent.
 
 ## 8. Compliance features
 - No automated scoring or ranking of founders.
+  *Changed 2026-10-01 (product decision): an AI agent pre-rates every company on the Fathom
+  criteria, including the Team dimension, from company-level information only (no names or
+  personal data); people can override any rating, and the agent never overwrites them.*
 - Every advance/pass decision requires a human click and is logged in an
   audit table (who, when, decision, pass code).
 - Retention: flag passed deals older than 12 months (configurable) and

@@ -2,14 +2,18 @@
 
 /** Deal detail: one company — decide, see why it scores what it does, its history, pin its rank. */
 
-import { Ban, Hourglass } from "lucide-react";
+import { Ban, Bot, Hourglass } from "lucide-react";
 import { redirect, useParams } from "next/navigation";
 
 import { DecideSection, RankOverrideForm } from "@/components/DealForms";
 import { DealNavBar, DealPosition, RankMetric } from "@/components/DealNav";
-import { Caption, DataTable, Eyebrow, Metric, Metrics, Notice, NUM, PageTitle } from "@/components/page";
+import { Caption, DataTable, Metric, Metrics, Notice, NUM, PageHeader } from "@/components/page";
+import { Badge } from "@/components/ui/badge";
 import { Tabs } from "@/components/Tabs";
+import { Card, CardContent } from "@/components/ui/card";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { formatTimestamp } from "@/lib/triage/dates";
+import type { Company } from "@/lib/triage/types";
 import { useCrm, useSearchRecord } from "@/components/useCrm";
 import * as repo from "@/lib/db/repository";
 import { pageNameFor, safeReturnHref, withQuery } from "@/lib/routes";
@@ -26,12 +30,12 @@ import {
   PASS_CODE_LABELS,
   rating,
 } from "@/lib/triage/labels";
-import { O1_DIMENSIONS, queueFlag, ratedCount, ratingsOf, scoreBand, type BreakdownRow } from "@/lib/triage/scoring";
+import { FATHOM_DIMENSIONS, queueFlag, ratedCount, ratingsOf, scoreBand, type BreakdownRow } from "@/lib/triage/scoring";
 
 import { EmptyCrm } from "../EmptyCrm";
 
 const DIMENSION_LABELS: Record<string, string> = {
-  ...Object.fromEntries(O1_DIMENSIONS.map((dimension) => [dimension.key, dimension.label])),
+  ...Object.fromEntries(FATHOM_DIMENSIONS.map((dimension) => [dimension.key, dimension.label])),
   storytelling_bonus: "Storytelling & design",
 };
 
@@ -64,19 +68,37 @@ export default function DealDetailPage() {
           .map((item) => ({ id: item.id, name: item.name, domain: item.website_domain }))}
       />
 
-      <Eyebrow>Deal detail</Eyebrow>
-      <PageTitle>{company.name}</PageTitle>
-      <p>
-        {company.one_liner}
-        <br />
-        {company.stage} · {euros(company.round_size_eur)} round · {company.country} · owner{" "}
-        <strong>{company.owner}</strong> · {company.website_domain || "no website"}
-      </p>
+      <PageHeader
+        eyebrow="Deal detail"
+        title={company.name}
+        description={
+          <>
+            {company.one_liner}
+            <span className="mt-2 flex flex-wrap gap-1.5">
+              <Badge variant="secondary">{company.stage}</Badge>
+              <Badge variant="secondary">{euros(company.round_size_eur)} round</Badge>
+              <Badge variant="secondary">{company.country}</Badge>
+              <Badge variant="outline">Owner {company.owner}</Badge>
+              <Badge variant="outline">{company.website_domain || "no website"}</Badge>
+            </span>
+          </>
+        }
+      />
 
       <Metrics>
         <Metric label="Decision" value={label(DECISION_LABELS, company.status)} />
         <RankMetric />
-        <Metric label="O1 score" value={`${pyFixed(company.score, 1)} %`} />
+        <Metric
+          label="Fathom score"
+          value={
+            <span className="flex flex-col">
+              {pyFixed(company.score, 1)} %
+              <span className="text-xs font-normal text-muted-foreground">
+                {scoreBand(company.score, ratedCount(company), loadTriageConfig().fathom)}
+              </span>
+            </span>
+          }
+        />
         <Metric label="Days in queue" value={waiting} />
         <Metric label="Touchpoints" value={company.touchpoint_count} />
       </Metrics>
@@ -95,11 +117,8 @@ export default function DealDetailPage() {
           </span>
         </Notice>
       ) : null}
-      <p className="text-sm">
-        <span className="text-muted-foreground">O1 assessment:</span>{" "}
-        <strong>{scoreBand(company.score, ratedCount(company), loadTriageConfig().o1)}</strong>
-      </p>
       {company.latest_signal ? <Caption>Latest signal: {company.latest_signal}</Caption> : null}
+      <RatingProvenance company={company} />
 
       <Tabs labels={["Decide", "Score breakdown", `History (${company.touchpoint_count})`, "Rank override"]}>
         <DecideSection
@@ -121,7 +140,7 @@ export default function DealDetailPage() {
             <DataTable>
               <TableHeader>
                 <TableRow>
-                  <TableHead>O1 dimension</TableHead>
+                  <TableHead>Fathom dimension</TableHead>
                   <TableHead className={NUM}>Rating</TableHead>
                   <TableHead className={NUM}>Weight</TableHead>
                   <TableHead className={NUM}>Points (%)</TableHead>
@@ -139,7 +158,7 @@ export default function DealDetailPage() {
                   </TableRow>
                 ))}
                 <TableRow className="font-semibold hover:bg-transparent">
-                  <TableCell>O1 score</TableCell>
+                  <TableCell>Fathom score</TableCell>
                   <TableCell />
                   <TableCell className={NUM}>100 %</TableCell>
                   <TableCell className={NUM}>{pyFixed(company.score, 1)}</TableCell>
@@ -149,7 +168,7 @@ export default function DealDetailPage() {
             </DataTable>
           ) : null}
           <Caption>
-            Points = weight × rating / {loadTriageConfig().o1.scale_max}. Every rating is a person&apos;s; unrated dimensions
+            Points = weight × rating / {loadTriageConfig().fathom.scale_max}. Every rating is a person&apos;s; unrated dimensions
             add nothing. Time in queue is not part of the score.
           </Caption>
         </div>
@@ -184,5 +203,33 @@ export default function DealDetailPage() {
         <RankOverrideForm key={company.rank_override ?? 0} companyId={company.id} current={company.rank_override} />
       </Tabs>
     </DealPosition>
+  );
+}
+
+/** Who rated the deal on Fathom, and the agent's three-sentence justification. */
+function RatingProvenance({ company }: { company: Company }) {
+  if (!company.rating_source) {
+    return <Notice tone="info">The Fathom agent has not rated this deal yet. You can rate it yourself below.</Notice>;
+  }
+  const when = company.rated_at ? ` on ${formatTimestamp(company.rated_at)} UTC` : "";
+  const byAgent = company.rating_source === "agent";
+  return (
+    <Card className="my-3">
+      <CardContent>
+        <h2 className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold tracking-wide text-muted-foreground uppercase">
+          <Bot className="size-4" aria-hidden="true" /> Why it ranks here
+        </h2>
+        {company.rating_rationale ? (
+          <p className="leading-relaxed">{company.rating_rationale}</p>
+        ) : (
+          <p className="text-muted-foreground">No justification recorded.</p>
+        )}
+        <Caption className="mb-0">
+          {byAgent
+            ? `Rated by the Fathom agent${company.rating_model ? ` (${company.rating_model})` : ""}${when}. Change any rating below: a person's ratings replace the agent's, and the agent never overwrites them.`
+            : `Ratings set by ${company.rated_by}${when}.${company.rating_rationale ? " The justification above is the Fathom agent's, from before the change." : ""}`}
+        </Caption>
+      </CardContent>
+    </Card>
   );
 }

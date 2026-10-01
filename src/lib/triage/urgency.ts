@@ -1,7 +1,7 @@
 /**
  * Urgency, cockpit priority, open tasks and the next action for a company.
  *
- * priority = O1 score % × urgency. Urgency comes only from obligations and news (an open warm
+ * priority = Fathom score % × urgency. Urgency comes only from obligations and news (an open warm
  * intro's reply-deadline stage, how recent the latest signal is) and never from days in
  * queue: waiting longer only raises the 14/21-day flag (user decision 2026-09-30).
  */
@@ -9,7 +9,7 @@
 import { demoToday, loadTriageConfig } from "./config";
 import { daysBetween, shortWeekday, type IsoDate } from "./dates";
 import { compareCodePoints, pyGet, pyRound } from "./py";
-import { DECISION_REQUIRED, O1_KEYS, queueFlag } from "./scoring";
+import { DECISION_REQUIRED, FATHOM_KEYS, queueFlag } from "./scoring";
 import { ESCALATED, introReplyState, REMINDER_TO_OWNER, type IntroReplyState } from "./workingDays";
 
 type IntroFields = { channel: string; intro_status: string; received_at: IsoDate; introducer_type: string };
@@ -27,13 +27,13 @@ export interface LineCompany<T extends IntroFields = IntroFields> {
   touchpoints: T[];
 }
 
-/** The cockpit's whole-number score % (the stored O1 score is already a percentage). */
+/** The cockpit's whole-number score % (the stored Fathom score is already a percentage). */
 export function scorePercent(score: number): number {
   return pyRound(score);
 }
 
-/** The open task while any O1 dimension is still unrated. */
-export const RATE_TASK = "Rate the O1 criteria";
+/** The open task while any Fathom dimension is still unrated. */
+export const RATE_TASK = "Rate the Fathom criteria";
 
 /** The company's open warm intro (the most recent one), or null. */
 export function openIntro<T extends IntroFields>(company: { touchpoints: T[] }): T | null {
@@ -86,10 +86,10 @@ export interface CockpitLine<C extends LineCompany = LineCompany> {
   urgent: boolean;
 }
 
-/** True while a person has not yet rated every O1 dimension (the storytelling bonus is optional). */
+/** True while a person has not yet rated every Fathom dimension (the storytelling bonus is optional). */
 export function needsRating(company: object): boolean {
   const ratings = company as Record<string, unknown>;
-  return O1_KEYS.some((key) => ratings[key] === null || ratings[key] === undefined);
+  return FATHOM_KEYS.some((key) => ratings[key] === null || ratings[key] === undefined);
 }
 
 const INTRODUCER_SHORT_LABELS: Record<string, string> = { LP: "LP", portfolio_founder: "Portfolio", angel: "Angel" };

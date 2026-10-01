@@ -20,7 +20,7 @@ import {
   setIntroStatus,
 } from "@/lib/crm/triageActions";
 import { ActionRefused } from "@/lib/triage/errors";
-import { emptyRatings, O1_KEYS } from "@/lib/triage/scoring";
+import { emptyRatings, FATHOM_KEYS } from "@/lib/triage/scoring";
 import { OUTSIDE_GEOGRAPHY, OUTSIDE_STAGE, TICKET_MISMATCH } from "@/lib/triage/filters";
 
 import { count, demoTexts, getCompanyOrThrow, loadDemo, robotix } from "./helpers";
@@ -65,8 +65,8 @@ describe("pipeline", () => {
     expect(repo.listCompanies().filter((company) => company.passed_hard_filters && company.pass_code)).toEqual([]);
   });
 
-  it("never fills an O1 rating and writes no decisions", () => {
-    for (const key of [...O1_KEYS, "storytelling_bonus"]) {
+  it("never fills an Fathom rating and writes no decisions", () => {
+    for (const key of [...FATHOM_KEYS, "storytelling_bonus"]) {
       expect(count("company", (row) => row[key] !== null)).toBe(0);
     }
     expect(count("company", (row) => row.score !== 0)).toBe(0);
@@ -130,7 +130,7 @@ describe("human actions", () => {
     expect(count("decision", (row) => row.decision === "rank_override")).toBe(1);
   });
 
-  it("rescores and logs human O1 ratings", () => {
+  it("rescores and logs human Fathom ratings", () => {
     expect(robotix().score).toBe(0);
     const ratings = { ...emptyRatings(), team: 5, market: 4, problem_solution_fit: 3 };
     saveRatings(robotix().id, ratings, PERSON);
@@ -140,7 +140,7 @@ describe("human actions", () => {
     expect(company.exit_potential).toBeNull();
     const [decision] = repo.listDecisions();
     expect(decision.decision).toBe("rating_changed");
-    expect(decision.comment).toMatch(/^O1 41\.0 %: team 5, market opportunity 4, problem–solution fit 3, /);
+    expect(decision.comment).toMatch(/^Fathom 41\.0 %: team 5, market opportunity 4, problem–solution fit 3, /);
   });
 
   it("refuses ratings outside 1–5 (bonus 0–5) and saves nothing", () => {

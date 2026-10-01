@@ -14,6 +14,8 @@ import { getVersion, subscribe } from "@/lib/db/connection";
 
 // The tab opens with the demo deal flow loaded, before any page renders (browser only: the
 // server never holds the CRM).
+// No AI call happens here: the bundled ratings are applied, and the live agent only runs
+// when a person presses "Rate with the Fathom agent" (it spends OpenAI credits).
 if (typeof window !== "undefined") loadDemoIfEmpty();
 
 /** Subscribe the calling page to the store; it then reads it through ``repo`` as before. */

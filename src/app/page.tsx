@@ -12,13 +12,18 @@
 import { CircleCheck, Hourglass, Pin } from "lucide-react";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { ExportControls, NavigateSelect, NextActionPill, type PillAction } from "@/components/CockpitClient";
 import { RememberDealList } from "@/components/dealList";
-import { Caption, Display, Lede, Metric, Metrics, Notice, NUM } from "@/components/page";
+import { HeaderActions } from "@/components/HeaderActions";
+import { Caption, DataTable, Metric, Metrics, NUM, PageHeader } from "@/components/page";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useActingMember, useCrm, useSearchRecord } from "@/components/useCrm";
 import * as repo from "@/lib/db/repository";
@@ -40,6 +45,8 @@ import { dayMonth, daysBetween, longDateWithYear, type IsoDate } from "@/lib/tri
 import { CHANNEL_LABELS, label, PASS_CODE_LABELS } from "@/lib/triage/labels";
 import { ratedCount } from "@/lib/triage/scoring";
 import { cn } from "@/lib/utils";
+
+import { EmptyCrm } from "./deals/EmptyCrm";
 
 const VIEW_SLUGS: Record<string, View> = { my: "My view", team: "Team view", pipeline: "Pipeline", hot: "Hot topics" };
 const SLUG_FOR_VIEW = Object.fromEntries(Object.entries(VIEW_SLUGS).map(([slug, view]) => [view, slug])) as Record<
@@ -64,6 +71,7 @@ export default function CockpitPage() {
   const team = teamNames();
   const owner = team.includes(one(params.owner)) ? one(params.owner) : member;
 
+  const router = useRouter();
   const today = demoToday();
   const lines = cockpitLines(today);
   const state: Changes = { view: SLUG_FOR_VIEW[view], tile, owner: one(params.owner) || null, all: showAll ? "1" : null };
@@ -72,39 +80,30 @@ export default function CockpitPage() {
 
   return (
     <>
-      <Display size="huge">The Monday Cockpit</Display>
-      <div className="mt-2.5 mb-1 text-sm font-semibold tracking-[0.22em] text-primary uppercase">
-        Skarv Ventures · deal-flow triage · {longDateWithYear(today)}
-      </div>
-      <Lede>One list: every company, its open tasks, the next step.</Lede>
+      <PageHeader
+        title="Monday cockpit"
+        eyebrow={longDateWithYear(today)}
+        description="One list: every company, its open tasks, the next step."
+        actions={
+          <Badge variant="outline" className="gap-1.5">
+            <span className="size-2 rounded-full bg-emerald-500" aria-hidden="true" /> Demo data
+          </Badge>
+        }
+      />
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-t-xl bg-foreground px-4.5 py-2.5 print:hidden">
-        <nav className="flex flex-wrap gap-2" aria-label="View">
+      <Tabs value={SLUG_FOR_VIEW[view]} onValueChange={(slug) => router.push(href({ view: slug }))}>
+        <TabsList className="print:hidden" aria-label="View">
           {(Object.keys(SLUG_FOR_VIEW) as View[]).map((name) => (
-            <Link
-              key={name}
-              href={href({ view: SLUG_FOR_VIEW[name] })}
-              className="rounded-full border border-[#4a4a52] px-4 py-1.5 text-[15px] font-semibold text-background no-underline transition-colors hover:border-background aria-[current=page]:border-primary aria-[current=page]:bg-primary aria-[current=page]:text-primary-foreground"
-              aria-current={name === view ? "page" : undefined}
-            >
+            <TabsTrigger key={name} value={SLUG_FOR_VIEW[name]}>
               {name}
-            </Link>
+            </TabsTrigger>
           ))}
-        </nav>
-        <div className="flex items-center gap-1.5 text-[15px] text-background">
-          <span className="size-2 rounded-full bg-[#3ecf6e]" aria-hidden="true" /> Demo Data
-        </div>
-      </div>
+        </TabsList>
+      </Tabs>
 
-      <div className="rounded-b-xl border border-t-0 bg-paper p-5 shadow-[0_8px_24px_rgb(22_22_26/0.06)] print:border-0 print:p-0 print:shadow-none">
+      <div className="mt-4">
         {!lines.length ? (
-          <Notice tone="info">
-            No deals loaded yet. Upload <code>demo/inbound_records.csv</code> and <code>demo/signals.csv</code> as a{" "}
-            <Link className="underline" href="/uploads">
-              Deal flow upload
-            </Link>
-            .
-          </Notice>
+          <EmptyCrm title="" />
         ) : view === "Pipeline" ? (
           <PipelineView lines={lines} />
         ) : view === "Hot topics" ? (
@@ -148,6 +147,7 @@ function WorkList({
   href: (changes: Changes) => string;
   currentHref: string;
 }) {
+  const router = useRouter();
   const filters = tileFilters(lines);
   const title = tileLabel(tile, view);
   const selected = filters[tile];
@@ -156,43 +156,48 @@ function WorkList({
   return (
     <>
       {view === "My view" ? (
-        <NavigateSelect
-          label="Deals owned by"
-          value={owner}
-          options={team}
-          hrefFor={Object.fromEntries(team.map((name) => [name, href({ owner: name })]))}
-        />
+        <HeaderActions>
+          <NavigateSelect
+            label="Deals owned by"
+            value={owner}
+            options={team}
+            hrefFor={Object.fromEntries(team.map((name) => [name, href({ owner: name })]))}
+          />
+        </HeaderActions>
       ) : null}
       <div className="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-5 print:hidden">
         {(Object.keys(TILES) as TileKey[]).map((key) => {
           const quiet = key === "drafts" || key === "tracking";
+          const active = key === tile;
           return (
             <Link
               key={key}
               href={href({ tile: key })}
-              className="group/tile flex min-h-16 items-center gap-3 rounded-lg border bg-card px-3.5 py-2.5 no-underline transition-colors hover:border-foreground aria-[current=true]:border-foreground aria-[current=true]:bg-foreground"
-              aria-current={key === tile ? "true" : undefined}
+              className="rounded-xl no-underline"
+              aria-current={active ? "true" : undefined}
               aria-label={`Show ${tileLabel(key, view)} (${filters[key].length})`}
             >
-              <span
+              <Card
                 className={cn(
-                  "font-display text-[40px] leading-none",
-                  quiet
-                    ? "text-foreground group-aria-[current=true]/tile:text-background"
-                    : "text-primary group-aria-[current=true]/tile:text-[#ff6b81]",
+                  "gap-1 py-3 transition-shadow hover:shadow-md",
+                  active && "bg-primary/5 ring-2 ring-primary",
                 )}
               >
-                {filters[key].length}
-              </span>
-              <span className="leading-tight text-foreground group-aria-[current=true]/tile:text-background">
-                {tileLabel(key, view)}
-              </span>
+                <CardHeader className="px-4">
+                  <CardDescription>{tileLabel(key, view)}</CardDescription>
+                  <CardTitle
+                    className={cn("text-3xl font-semibold tabular-nums", quiet ? "text-foreground" : "text-primary")}
+                  >
+                    {filters[key].length}
+                  </CardTitle>
+                </CardHeader>
+              </Card>
             </Link>
           );
         })}
       </div>
 
-      <ListHead title={`${title} · O1 score × urgency`} />
+      <ListHead title={`${title} · Importance Score × Urgency Score`} />
       {!selected.length ? (
         <p className="flex items-center gap-2">
           <CircleCheck className="size-4 text-success-foreground" aria-hidden="true" /> Nothing here right now.
@@ -210,13 +215,14 @@ function WorkList({
               <Caption>
                 Showing {showAll ? selected.length : Math.min(PAGE_SIZE, selected.length)} of {selected.length}.
               </Caption>
-              <Link
-                className="inline-flex items-center gap-2 text-sm no-underline"
-                href={href({ all: showAll ? null : "1" })}
-                aria-label={showAll ? "Show all: on" : "Show all: off"}
-              >
-                <Switch checked={showAll} tabIndex={-1} aria-hidden="true" className="pointer-events-none" /> Show all
-              </Link>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="show-all"
+                  checked={showAll}
+                  onCheckedChange={(checked) => router.push(href({ all: checked ? "1" : null }))}
+                />
+                <Label htmlFor="show-all">Show all</Label>
+              </div>
             </div>
           ) : null}
         </>
@@ -230,8 +236,8 @@ function WorkList({
           Description: line.company.one_liner,
           Stage: line.company.stage,
           Country: line.company.country,
-          "Score %": line.score_percent,
-          Urgency: line.urgency,
+          "Importance Score": line.score_percent,
+          "Urgency Score": line.urgency,
           "Open tasks": line.tasks.join("; "),
           "Next action": line.next_action,
           "Days in queue": line.days_in_queue,
@@ -244,9 +250,9 @@ function WorkList({
 
 function ListHead({ title, hint }: { title: string; hint?: string }) {
   return (
-    <div className="mt-4.5 mb-1 flex flex-wrap items-baseline justify-between gap-3">
-      <h2 className="text-base font-bold tracking-[0.06em] uppercase">{title}</h2>
-      {hint ? <span className="text-sm text-muted-foreground italic">{hint}</span> : null}
+    <div className="mt-6 mb-2 flex flex-wrap items-baseline justify-between gap-3">
+      <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+      {hint ? <span className="text-sm text-muted-foreground">{hint}</span> : null}
     </div>
   );
 }
@@ -281,8 +287,8 @@ function PriorityTable({ lines, actionable, currentHref }: { lines: Line[]; acti
           <TableHead className={RANK}>#</TableHead>
           <TableHead>Company</TableHead>
           <TableHead>Description</TableHead>
-          <TableHead className={NUM}>O1 %</TableHead>
-          <TableHead className={NUM}>Urgency</TableHead>
+          <TableHead className={NUM}>Importance Score</TableHead>
+          <TableHead className={NUM}>Urgency Score</TableHead>
           <TableHead>Open tasks</TableHead>
           <TableHead>{actionable ? "Next action" : "Assigned to · next step"}</TableHead>
         </TableRow>
@@ -299,9 +305,14 @@ function PriorityTable({ lines, actionable, currentHref }: { lines: Line[]; acti
               <TableCell className={RANK}>
                 {index + 1}
                 {company.rank_override ? (
-                  <span title={`Pinned: ${company.rank_override_comment}`}>
-                    <Pin className="ml-1 inline size-3.5 text-primary" aria-label="Pinned" />
-                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span tabIndex={0} className="ml-1 inline-flex">
+                        <Pin className="size-3.5 text-primary" aria-label={`Pinned: ${company.rank_override_comment}`} />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>Pinned: {company.rank_override_comment}</TooltipContent>
+                  </Tooltip>
                 ) : null}
               </TableCell>
               <TableCell>
@@ -331,7 +342,7 @@ function PriorityTable({ lines, actionable, currentHref }: { lines: Line[]; acti
                 {ratedCount(company) ? (
                   line.score_percent
                 ) : (
-                  <span className="text-muted-foreground" title="No O1 rating yet">
+                  <span className="text-muted-foreground" title="No Fathom rating yet">
                     –<span className="sr-only">not rated</span>
                   </span>
                 )}
@@ -340,14 +351,19 @@ function PriorityTable({ lines, actionable, currentHref }: { lines: Line[]; acti
                 {line.urgency}
               </TableCell>
               <TableCell className="text-center">
-                <Badge
-                  variant={line.urgent ? "default" : "muted"}
-                  className="h-6 min-w-7 font-bold"
-                  title={tasksText}
-                  aria-label={`${line.tasks.length} open tasks: ${tasksText}`}
-                >
-                  {line.tasks.length}
-                </Badge>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge
+                      tabIndex={0}
+                      variant={line.urgent ? "default" : "secondary"}
+                      className="h-6 min-w-7 font-semibold"
+                      aria-label={`${line.tasks.length} open tasks: ${tasksText}`}
+                    >
+                      {line.tasks.length}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>{tasksText}</TooltipContent>
+                </Tooltip>
               </TableCell>
               <TableCell>
                 {actionable ? (
@@ -370,9 +386,9 @@ function PriorityTable({ lines, actionable, currentHref }: { lines: Line[]; acti
 
 const RANK = "w-10 text-right text-muted-foreground tabular-nums";
 
-/** The cockpit's own table look: an ink rule under the header, no outer border. */
+/** The cockpit's tables: bordered, on a card. */
 function CockpitTable({ children }: { children: ReactNode }) {
-  return <Table className="[&_th]:border-b-2 [&_th]:border-foreground [&_th]:text-[15px] [&_th]:font-bold">{children}</Table>;
+  return <DataTable>{children}</DataTable>;
 }
 
 /** ``Series.value_counts()``: most frequent first; ties keep first-seen order. */

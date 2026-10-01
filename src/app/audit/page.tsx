@@ -3,7 +3,9 @@
 /** Audit log: every decision, rating, rank override and merge — each one a person's click. */
 
 import { AuditTable } from "@/components/Filtered";
-import { Caption, Notice, PageTitle } from "@/components/page";
+import { ReceiptText } from "lucide-react";
+
+import { EmptyState, PageHeader } from "@/components/page";
 import { useCrm } from "@/components/useCrm";
 import * as repo from "@/lib/db/repository";
 import { formatTimestamp } from "@/lib/triage/dates";
@@ -14,10 +16,18 @@ export default function AuditLogPage() {
   const decisions = repo.listDecisions();
   return (
     <>
-      <PageTitle>Audit log</PageTitle>
-      <Caption>Every decision, rating, rank override and merge — each one a person&apos;s click.</Caption>
+      <PageHeader
+        title="Audit log"
+        description={
+          <>
+            Every decision, rating, rank override and merge — each one a person&apos;s click.
+          </>
+        }
+      />
       {!decisions.length ? (
-        <Notice tone="info">No decisions logged yet.</Notice>
+        <EmptyState icon={ReceiptText} title="No decisions logged yet">
+          Every advance, pass, rating change, merge and rank override appears here, with who and when.
+        </EmptyState>
       ) : (
         <AuditTable
           rows={decisions.map((decision) => ({

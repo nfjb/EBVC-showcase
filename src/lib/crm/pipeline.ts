@@ -8,8 +8,11 @@ import signalsDemo from "../../../demo/signals.csv?raw";
 
 import { atomic } from "@/lib/db/connection";
 import * as repo from "@/lib/db/repository";
+import { agentInput, type AgentInput } from "@/lib/triage/agentRating";
 import { loadTriageConfig } from "@/lib/triage/config";
 import { planPipeline } from "@/lib/triage/pipeline";
+
+import { applyBundledRatings, rememberAgentInputs } from "./agent";
 
 export interface PipelineCounts {
   raw_records: number;
@@ -28,11 +31,13 @@ export interface PipelineCounts {
 export function runPipeline(inboundText: string, signalsText: string): PipelineCounts {
   const plan = planPipeline(inboundText, signalsText, loadTriageConfig());
 
+  const agentInputs = new Map<number, AgentInput>();
   const counts = atomic(() => {
     repo.clearCrm();
-    const companyIds = plan.companies.map(({ fields, touchpoints }) => {
+    const companyIds = plan.companies.map(({ fields, touchpoints, signals }) => {
       const companyId = repo.insertCompany(fields);
       for (const touchpoint of touchpoints) repo.insertTouchpoint(companyId, touchpoint);
+      agentInputs.set(companyId, agentInput(fields, touchpoints, signals));
       return companyId;
     });
     for (const suggestion of plan.suggestions) {
@@ -50,6 +55,8 @@ export function runPipeline(inboundText: string, signalsText: string): PipelineC
     };
   });
 
+  // The pipeline itself rates nothing; it hands each company to the Fathom agent.
+  rememberAgentInputs(agentInputs);
   return counts;
 }
 
@@ -77,6 +84,8 @@ export function createUpload({ inbound, signals, uploadedBy }: UploadInput): Upl
   };
   try {
     const counts = runPipeline(inbound.text, signals.text);
+    // The Fathom agent's bundled ratings (demo companies); the rest are rated live in the browser.
+    applyBundledRatings();
     const id = repo.insertUpload({
       ...record,
       raw_record_count: counts.raw_records,

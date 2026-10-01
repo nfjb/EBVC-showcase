@@ -7,15 +7,16 @@
 
 import Link from "next/link";
 
-import { Mail } from "lucide-react";
+import { CircleCheck, Handshake, Mail } from "lucide-react";
 
 import { RememberDealList } from "@/components/dealList";
 import { IntroMoreActions } from "@/components/IntroActions";
 import { IntroReplyButton } from "@/components/ReplyDialogs";
-import { Caption, DataTable, Notice, PageTitle } from "@/components/page";
+import { DataTable, EmptyState, PageHeader } from "@/components/page";
 import { Tabs } from "@/components/Tabs";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCrm } from "@/components/useCrm";
 import * as repo from "@/lib/db/repository";
@@ -26,6 +27,7 @@ import { loadTriageConfig, responsiblePartners } from "@/lib/triage/config";
 import { longDate } from "@/lib/triage/dates";
 import { INTRODUCER_LABELS, introUrgency, label } from "@/lib/triage/labels";
 import { pyGet } from "@/lib/triage/py";
+import { ESCALATED } from "@/lib/triage/workingDays";
 
 import { EmptyCrm } from "../deals/EmptyCrm";
 
@@ -40,25 +42,32 @@ function IntroCard({ item }: { item: IntroWithState }) {
       : `owner ${intro.recipient}, escalates to ${partner}`;
   const withTouchpoints = { ...company, touchpoints: repo.touchpointsOf(company.id) };
   return (
-    <Card className="my-2.5">
-      <CardContent className="flex flex-wrap items-start gap-4">
-        <div className="flex-[3_1_320px]">
-          <strong>{company.name}</strong> · {introUrgency(intro.intro_status, state)}
-          <br />
-          From <strong>{intro.introducer_name}</strong> ({label(INTRODUCER_LABELS, intro.introducer_type)}) · received{" "}
+    <Item variant="outline" className="bg-card">
+      <ItemMedia variant="icon">
+        <Handshake aria-hidden="true" />
+      </ItemMedia>
+      <ItemContent>
+        <ItemTitle className="flex-wrap">
+          {company.name}
+          <Badge variant={state.past_deadline || state.escalation === ESCALATED ? "default" : "secondary"}>
+            {introUrgency(intro.intro_status, state)}
+          </Badge>
+        </ItemTitle>
+        <ItemDescription>
+          From {intro.introducer_name} ({label(INTRODUCER_LABELS, intro.introducer_type)}) · received{" "}
           {longDate(intro.received_at)} · {ownership}
-        </div>
-        <div className="flex flex-[2_1_260px] items-start justify-end gap-2">
-          <IntroReplyButton data={introReplyDialogData(intro, withTouchpoints)} variant="default" size="lg">
-            <Mail aria-hidden="true" /> Reply
-          </IntroReplyButton>
-          <Button variant="outline" size="lg" asChild>
-            <Link href={dealHref(company.id, HERE)}>Open deal</Link>
-          </Button>
-          <IntroMoreActions introId={intro.id} />
-        </div>
-      </CardContent>
-    </Card>
+        </ItemDescription>
+      </ItemContent>
+      <ItemActions>
+        <IntroReplyButton data={introReplyDialogData(intro, withTouchpoints)} variant="default">
+          <Mail aria-hidden="true" /> Reply
+        </IntroReplyButton>
+        <Button variant="outline" asChild>
+          <Link href={dealHref(company.id, HERE)}>Open deal</Link>
+        </Button>
+        <IntroMoreActions introId={intro.id} />
+      </ItemActions>
+    </Item>
   );
 }
 
@@ -85,19 +94,27 @@ export default function IntroTrackerPage() {
   );
   return (
     <>
-      <PageTitle>Intro tracker</PageTitle>
-      <Caption>
-        Warm intros get a reply within {replyDays} working days, whatever the fit. Day 2: reminder to the owner. Day 3:
-        escalated to the responsible partner.
-      </Caption>
+      <PageHeader
+        title="Intro tracker"
+        description={
+          <>
+            Warm intros get a reply within {replyDays} working days, whatever the fit. Day 2: reminder to the owner. Day 3: escalated to the responsible partner.
+          </>
+        }
+      />
       <RememberDealList title="Intros needing a reply" ids={[...new Set(waiting.map(({ company }) => company.id))]} />
       <Tabs labels={[`Needs a reply (${waiting.length})`, `All intros (${states.length})`]}>
-        <div>
-          {!waiting.length ? <Notice tone="success">Every warm intro has had a reply.</Notice> : null}
-          {waiting.map((item) => (
-            <IntroCard key={item.intro.id} item={item} />
-          ))}
-        </div>
+        {!waiting.length ? (
+          <EmptyState icon={CircleCheck} title="All caught up">
+            Every warm intro has had a reply.
+          </EmptyState>
+        ) : (
+          <ItemGroup className="gap-2">
+            {waiting.map((item) => (
+              <IntroCard key={item.intro.id} item={item} />
+            ))}
+          </ItemGroup>
+        )}
         <DataTable tall>
           <TableHeader>
             <TableRow>

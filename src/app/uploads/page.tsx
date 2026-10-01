@@ -4,8 +4,9 @@
 
 import { CircleCheck, TriangleAlert } from "lucide-react";
 
-import { Caption, DataTable, NUM, PageTitle } from "@/components/page";
+import { Caption, DataTable, NUM, PageHeader } from "@/components/page";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AgentRateButton } from "@/components/AgentRateButton";
 import { UploadForm } from "@/components/UploadForm";
 import { useCrm } from "@/components/useCrm";
 import * as repo from "@/lib/db/repository";
@@ -16,12 +17,16 @@ export default function UploadsPage() {
   const uploads = repo.listUploads();
   return (
     <>
-      <PageTitle>Deal flow uploads</PageTitle>
-      <Caption>
-        Merge records into companies and touchpoints, queue fuzzy matches as suggested merges, apply the hard filters and
-        score every company.
-      </Caption>
+      <PageHeader
+        title="Deal flow uploads"
+        description={
+          <>
+            Merge records into companies and touchpoints, queue fuzzy matches as suggested merges, apply the hard filters and score every company.
+          </>
+        }
+      />
       <UploadForm />
+      <AgentRateButton />
       <h2 className="mt-7 mb-2 text-xl font-bold">Previous runs</h2>
       {!uploads.length ? (
         <Caption>No uploads yet.</Caption>

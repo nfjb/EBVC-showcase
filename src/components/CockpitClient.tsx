@@ -1,17 +1,19 @@
 "use client";
 
-import { Download } from "lucide-react";
+import { ChevronDown, Download, Printer } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toCsv } from "@/lib/triage/csv";
 import { cn } from "@/lib/utils";
 
-import { Caption, DataTable, NUM } from "./page";
+import { DataTable, NUM } from "./page";
 import { IntroReplyButton, PassButton, type IntroDialogData, type PassDialogData } from "./ReplyDialogs";
 
 export type PillAction =
@@ -58,14 +60,17 @@ export function NavigateSelect({
 }) {
   const router = useRouter();
   const id = `navigate-${label.replaceAll(" ", "-").toLowerCase()}`;
+  // Compact, for the top bar: the label beside a small select.
   return (
-    <div className="my-2.5 grid max-w-80 gap-1.5 print:hidden">
-      <Label htmlFor={id}>{label}</Label>
+    <div className="flex items-center gap-2 print:hidden">
+      <Label htmlFor={id} className="hidden text-sm font-normal whitespace-nowrap text-muted-foreground sm:block">
+        {label}
+      </Label>
       <Select value={value} onValueChange={(next) => router.push(hrefFor[next])}>
-        <SelectTrigger id={id} className="w-full bg-card">
+        <SelectTrigger id={id} size="sm" className="w-44" aria-label={label}>
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent align="end">
           {options.map((option) => (
             <SelectItem key={option} value={option}>
               {option}
@@ -84,8 +89,8 @@ export interface ExportRow {
   Description: string;
   Stage: string;
   Country: string;
-  "Score %": number;
-  Urgency: number;
+  "Importance Score": number;
+  "Urgency Score": number;
   "Open tasks": string;
   "Next action": string;
   "Days in queue": number;
@@ -99,8 +104,8 @@ const EXPORT_COLUMNS: (keyof ExportRow)[] = [
   "Description",
   "Stage",
   "Country",
-  "Score %",
-  "Urgency",
+  "Importance Score",
+  "Urgency Score",
   "Open tasks",
   "Next action",
   "Days in queue",
@@ -122,46 +127,51 @@ export function ExportControls({ fileName, rows }: { fileName: string; rows: Exp
   }
   const printColumns = EXPORT_COLUMNS.filter((column) => column !== "Website");
   return (
-    <div className="mt-4">
-      <div className="my-2.5 print:hidden">
-        <Button variant="outline" size="lg" onClick={download} disabled={!rows.length}>
+    <Collapsible className="mt-4">
+      <ButtonGroup className="print:hidden">
+        <Button variant="outline" onClick={download} disabled={!rows.length}>
           <Download aria-hidden="true" /> Export to CSV
         </Button>
-      </div>
-      {/* A native <details>, so the print stylesheet can open it for the Monday meeting. */}
-      <details className="print-view group my-2 rounded-lg border bg-card">
-        <summary className="cursor-pointer px-3.5 py-2.5 font-medium">Print view for the Monday meeting</summary>
-        <div className="px-3.5 pb-3.5">
-          <Caption className="print:hidden">Print with Ctrl+P.</Caption>
-          {rows.length ? (
-            <DataTable>
-              <TableHeader>
-                <TableRow>
+        <CollapsibleTrigger asChild>
+          <Button variant="outline" className="group/print">
+            <ChevronDown className="transition-transform group-data-[state=open]/print:rotate-180" aria-hidden="true" />
+            Print view for the Monday meeting
+          </Button>
+        </CollapsibleTrigger>
+        <Button variant="outline" onClick={() => window.print()} disabled={!rows.length}>
+          <Printer aria-hidden="true" /> Print
+        </Button>
+      </ButtonGroup>
+      {/* Always mounted, so printing shows the table even when it is collapsed on screen. */}
+      <CollapsibleContent forceMount className="mt-3 data-[state=closed]:hidden print:!block">
+        {rows.length ? (
+          <DataTable>
+            <TableHeader>
+              <TableRow>
+                {printColumns.map((column) => (
+                  <TableHead key={column} className={cn(typeof rows[0][column] === "number" && NUM)}>
+                    {column}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.Rank}>
                   {printColumns.map((column) => (
-                    <TableHead key={column} className={cn(typeof rows[0][column] === "number" && NUM)}>
-                      {column}
-                    </TableHead>
+                    <TableCell
+                      key={column}
+                      className={cn("whitespace-normal align-top", typeof row[column] === "number" && NUM)}
+                    >
+                      {row[column]}
+                    </TableCell>
                   ))}
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.Rank}>
-                    {printColumns.map((column) => (
-                      <TableCell
-                        key={column}
-                        className={cn("whitespace-normal align-top", typeof row[column] === "number" && NUM)}
-                      >
-                        {row[column]}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </DataTable>
-          ) : null}
-        </div>
-      </details>
-    </div>
+              ))}
+            </TableBody>
+          </DataTable>
+        ) : null}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

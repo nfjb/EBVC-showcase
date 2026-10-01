@@ -1,55 +1,151 @@
 "use client";
 
 /**
- * The priority matrix chart: every open, filter-passing deal on score % × urgency.
+ * The priority matrix chart (shadcn Chart on Recharts, in a Card): every open, filter-passing
+ * deal on Fathom score % × urgency.
  *
  * Position is score and urgency, size is the number of touchpoints, and shape and colour both
- * show the source (warm intro ▲ or cold ●), so identity never rests on colour alone. Clicking
- * a bubble (or pressing Enter on it) opens the deal.
+ * show the source (warm intro ▲ or cold ●), so identity never rests on colour alone. The four
+ * quadrants share their colours with the tiles above the chart. Clicking a bubble opens the
+ * deal; the table under the chart lists the same deals as links, which is the keyboard and
+ * screen-reader route.
  */
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import {
+  CartesianGrid,
+  LabelList,
+  ReferenceArea,
+  ReferenceLine,
+  Scatter,
+  ScatterChart,
+  XAxis,
+  YAxis,
+  ZAxis,
+} from "recharts";
 
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import type { MatrixRow } from "@/lib/triage/cockpit";
+import type { QuadrantKey } from "@/lib/triage/urgency";
 
 import { rememberDealList } from "./dealList";
 
-const WARM = "#C8102E"; // Skarv red; validated as a pair with COLD (CVD ΔE 21.9)
-const COLD = "#1F5FB8";
-const INK = "#16161a";
-const MUTED = "#5f5b55";
+/** One colour per quadrant, shared by the chart and the quadrant tiles (theme tokens). */
+export const QUADRANT_COLOURS: Record<QuadrantKey, string> = {
+  act_now: "var(--act)",
+  plan: "var(--plan)",
+  reply_fast: "var(--reply)",
+  park: "var(--park)",
+};
 
-const WIDTH = 960;
-const HEIGHT = 520;
-const MARGIN = { top: 12, right: 18, bottom: 104, left: 56 };
-const PLOT_W = WIDTH - MARGIN.left - MARGIN.right;
-const PLOT_H = HEIGHT - MARGIN.top - MARGIN.bottom;
-const Y_DOMAIN: [number, number] = [20, 104];
+const Y_DOMAIN: [number, number] = [20, 100];
+const TOOLTIP_FIELDS = [
+  ["Quadrant", "Quadrant"],
+  ["Score %", "Importance Score"],
+  ["Urgency", "Urgency Score"],
+  ["Touchpoints", "Touchpoints"],
+  ["Source", "Source"],
+  ["Next action", "Next action"],
+  ["Owner", "Owner"],
+] as const;
 
-/** Vega's size channel is the symbol's area in px²: touchpoints 1–5 → 90–520. */
-function symbolArea(touchpoints: number): number {
-  return 90 + ((touchpoints - 1) / (5 - 1)) * (520 - 90);
+const CONFIG = {
+  warm: { label: "Warm intro", color: "var(--warm)" },
+  cold: { label: "Cold inbound", color: "var(--cold)" },
+} satisfies ChartConfig;
+
+/** The score axis, zoomed to the deals (in tens) but always showing the score split. */
+function scoreDomain(rows: MatrixRow[], split: number): [number, number] {
+  const xs = rows.map((row) => row.x);
+  const low = Math.max(0, Math.floor((Math.min(split, ...xs) - 4) / 10) * 10);
+  const high = Math.min(100, Math.ceil((Math.max(split, ...xs) + 4) / 10) * 10);
+  return [low, high];
 }
 
-function symbolPath(source: MatrixRow["Source"], area: number): string {
-  if (source === "Warm intro") {
-    const side = Math.sqrt((4 * area) / Math.sqrt(3));
-    const height = (Math.sqrt(3) / 2) * side;
-    // Centroid at the origin.
-    return `M0,${(-2 * height) / 3}L${side / 2},${height / 3}L${-side / 2},${height / 3}Z`;
+/**
+ * Of the labelled deals (highest priority first), keep those whose label would not collide
+ * with one already placed; the tooltip still names every deal.
+ */
+function placeLabels(rows: MatrixRow[], labelledIds: number[], xSpan: number): Set<number> {
+  const byId = new Map(rows.map((row) => [row.company_id, row]));
+  const placed: MatrixRow[] = [];
+  for (const id of labelledIds) {
+    const row = byId.get(id);
+    if (!row) continue;
+    const clear = placed.every(
+      (other) =>
+        Math.abs(other.x - row.x) > xSpan * 0.14 || Math.abs(other.y - row.y) > (Y_DOMAIN[1] - Y_DOMAIN[0]) * 0.06,
+    );
+    if (clear) placed.push(row);
   }
-  const radius = Math.sqrt(area / Math.PI);
-  return `M${radius},0A${radius},${radius} 0 1,1 ${-radius},0A${radius},${radius} 0 1,1 ${radius},0Z`;
+  return new Set(placed.map((row) => row.company_id));
 }
 
-function niceTicks(low: number, high: number, count: number): number[] {
-  const raw = (high - low) / count;
-  const magnitude = 10 ** Math.floor(Math.log10(raw));
-  const step = [1, 2, 5, 10].map((factor) => factor * magnitude).find((candidate) => candidate >= raw) ?? raw;
-  const ticks: number[] = [];
-  for (let value = Math.ceil(low / step) * step; value <= high + 1e-9; value += step) ticks.push(Number(value.toFixed(6)));
-  return ticks;
+function DealTooltip({ active, payload }: { active?: boolean; payload?: { payload: MatrixRow }[] }) {
+  const row = active ? payload?.[0]?.payload : undefined;
+  if (!row) return null;
+  return (
+    <div className="grid min-w-52 gap-1.5 rounded-lg border bg-background px-3 py-2 text-xs shadow-xl">
+      <div className="flex items-center gap-2 font-medium">
+        <span
+          className="size-2 rounded-full"
+          style={{ background: QUADRANT_COLOURS[row.quadrant_key] }}
+          aria-hidden="true"
+        />
+        {row.Company}
+      </div>
+      <dl className="grid gap-0.5">
+        {TOOLTIP_FIELDS.map(([field, fieldLabel]) => (
+          <div key={field} className="flex justify-between gap-4">
+            <dt className="text-muted-foreground">{fieldLabel}</dt>
+            <dd className="font-medium text-foreground tabular-nums">{row[field]}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+/** The chart's legend, with the real symbols. */
+function Legend() {
+  return (
+    <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+      <li className="flex items-center gap-1.5">
+        <svg viewBox="0 0 12 12" className="size-3" aria-hidden="true">
+          <path d="M6 1 11 11H1Z" fill="var(--warm)" />
+        </svg>
+        Warm intro
+      </li>
+      <li className="flex items-center gap-1.5">
+        <svg viewBox="0 0 12 12" className="size-3" aria-hidden="true">
+          <circle cx="6" cy="6" r="5" fill="var(--cold)" />
+        </svg>
+        Cold inbound
+      </li>
+      <li className="flex items-center gap-1.5">
+        <svg viewBox="0 0 28 12" className="h-3 w-7" aria-hidden="true">
+          <circle cx="4" cy="6" r="2.5" fill="currentColor" opacity="0.5" />
+          <circle cx="17" cy="6" r="5" fill="currentColor" opacity="0.5" />
+        </svg>
+        Size = touchpoints
+      </li>
+      <li className="flex items-center gap-1.5">
+        <svg viewBox="0 0 20 12" className="h-3 w-5" aria-hidden="true">
+          <line x1="0" y1="6" x2="20" y2="6" stroke="currentColor" strokeDasharray="3 3" />
+        </svg>
+        Quadrant split
+      </li>
+    </ul>
+  );
 }
 
 export function MatrixChart({
@@ -60,6 +156,7 @@ export function MatrixChart({
   priorityOrder,
 }: {
   rows: MatrixRow[];
+  /** Deals worth a label, highest priority first. */
   labelledIds: number[];
   splits: { score_split: number; urgency_split: number };
   dealHrefs: Record<number, string>;
@@ -67,176 +164,183 @@ export function MatrixChart({
   priorityOrder: number[];
 }) {
   const router = useRouter();
-  const [hovered, setHovered] = useState<MatrixRow | null>(null);
-
-  // The O1 score is a percentage: the axis always runs 0–100 so positions compare across views.
-  const xMax = 104;
-  const sx = (value: number) => MARGIN.left + (value / xMax) * PLOT_W;
-  const sy = (value: number) => MARGIN.top + PLOT_H - ((value - Y_DOMAIN[0]) / (Y_DOMAIN[1] - Y_DOMAIN[0])) * PLOT_H;
   const { score_split: scoreSplit, urgency_split: urgencySplit } = splits;
+  const [xLow, xHigh] = scoreDomain(rows, scoreSplit);
+  const labelled = placeLabels(rows, labelledIds, xHigh - xLow);
+  const xTicks = Array.from({ length: (xHigh - xLow) / 10 + 1 }, (_, index) => xLow + index * 10);
 
-  const bands = [
-    { x: scoreSplit, x2: xMax, y: urgencySplit, y2: 104, fill: "#f7e1e4" },
-    { x: scoreSplit, x2: xMax, y: 20, y2: urgencySplit, fill: "#eef1f6" },
-    { x: 0, x2: scoreSplit, y: urgencySplit, y2: 104, fill: "#f6efe6" },
-    { x: 0, x2: scoreSplit, y: 20, y2: urgencySplit, fill: "#f3f1ed" },
-  ];
-  const labelled = rows
-    .filter((row) => labelledIds.includes(row.company_id))
-    .sort((a, b) => a.x - b.x);
-
-  function open(row: MatrixRow) {
+  function open(row: MatrixRow | undefined) {
+    if (!row) return;
     rememberDealList("Priority matrix", priorityOrder);
     router.push(dealHrefs[row.company_id]);
   }
 
-  const legendY = HEIGHT - 40;
+  const zones: { key: QuadrantKey; name: string; x1: number; x2: number; y1: number; y2: number; position: string }[] =
+    [
+      {
+        key: "reply_fast",
+        name: "Reply fast",
+        x1: xLow,
+        x2: scoreSplit,
+        y1: urgencySplit,
+        y2: Y_DOMAIN[1],
+        position: "insideTopLeft",
+      },
+      {
+        key: "act_now",
+        name: "Act now",
+        x1: scoreSplit,
+        x2: xHigh,
+        y1: urgencySplit,
+        y2: Y_DOMAIN[1],
+        position: "insideTopRight",
+      },
+      {
+        key: "park",
+        name: "Park or pass",
+        x1: xLow,
+        x2: scoreSplit,
+        y1: Y_DOMAIN[0],
+        y2: urgencySplit,
+        position: "insideBottomLeft",
+      },
+      {
+        key: "plan",
+        name: "Plan a deep dive",
+        x1: scoreSplit,
+        x2: xHigh,
+        y1: Y_DOMAIN[0],
+        y2: urgencySplit,
+        position: "insideBottomRight",
+      },
+    ];
+
+  const series = [
+    { key: "cold" as const, shape: "circle" as const, data: rows.filter((row) => row.Source !== "Warm intro") },
+    { key: "warm" as const, shape: "triangle" as const, data: rows.filter((row) => row.Source === "Warm intro") },
+  ];
+
   return (
-    <div className="relative rounded-lg border bg-card p-2">
-      <svg className="block h-auto w-full" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Priority matrix: O1 score % against urgency">
-        {bands.map((band) => (
-          <rect
-            key={band.fill}
-            x={sx(band.x)}
-            y={sy(band.y2)}
-            width={sx(band.x2) - sx(band.x)}
-            height={sy(band.y) - sy(band.y2)}
-            fill={band.fill}
-            opacity={0.9}
-          />
-        ))}
-        <rect x={MARGIN.left} y={MARGIN.top} width={PLOT_W} height={PLOT_H} fill="none" stroke="#e2ddd5" />
-
-        {/* axes */}
-        {niceTicks(0, xMax, 6).map((tick) => (
-          <g key={`x${tick}`} transform={`translate(${sx(tick)},${MARGIN.top + PLOT_H})`}>
-            <line y2={5} stroke="#c9c3ba" />
-            <text y={18} textAnchor="middle" fontSize={12} fill={MUTED}>
-              {tick}
-            </text>
-          </g>
-        ))}
-        {niceTicks(Y_DOMAIN[0], Y_DOMAIN[1], 5).map((tick) => (
-          <g key={`y${tick}`} transform={`translate(${MARGIN.left},${sy(tick)})`}>
-            <line x2={-5} stroke="#c9c3ba" />
-            <text x={-8} dy="0.32em" textAnchor="end" fontSize={12} fill={MUTED}>
-              {tick}
-            </text>
-          </g>
-        ))}
-        <line x1={MARGIN.left} x2={MARGIN.left + PLOT_W} y1={MARGIN.top + PLOT_H} y2={MARGIN.top + PLOT_H} stroke="#c9c3ba" />
-        <line x1={MARGIN.left} x2={MARGIN.left} y1={MARGIN.top} y2={MARGIN.top + PLOT_H} stroke="#c9c3ba" />
-        <text x={MARGIN.left + PLOT_W / 2} y={MARGIN.top + PLOT_H + 38} textAnchor="middle" fontSize={13} fontWeight={700} fill={INK}>
-          O1 score %
-        </text>
-        <text
-          transform={`translate(${MARGIN.left - 40},${MARGIN.top + PLOT_H / 2}) rotate(-90)`}
-          textAnchor="middle"
-          fontSize={13}
-          fontWeight={700}
-          fill={INK}
+    <Card>
+      <CardHeader>
+        <CardTitle>{rows.length} open deals by Importance Score and Urgency Score</CardTitle>
+        <CardDescription>Hover a deal for details; click it to open the deal.</CardDescription>
+        <CardAction className="max-sm:col-start-1 max-sm:row-start-3 max-sm:justify-self-start">
+          <Legend />
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        <ChartContainer
+          config={CONFIG}
+          className="aspect-auto h-[460px] w-full"
+          role="img"
+          aria-label="Priority matrix: Importance Score against Urgency Score. The table below lists every deal shown."
         >
-          Urgency
-        </text>
-
-        {/* quadrant splits and corner labels */}
-        <line x1={sx(scoreSplit)} x2={sx(scoreSplit)} y1={sy(104)} y2={sy(20)} stroke={INK} strokeDasharray="4 4" strokeWidth={1.5} />
-        <line x1={sx(0)} x2={sx(xMax)} y1={sy(urgencySplit)} y2={sy(urgencySplit)} stroke={INK} strokeDasharray="4 4" strokeWidth={1.5} />
-        <text x={sx(xMax - 1)} y={sy(102)} dy="0.8em" textAnchor="end" fontSize={13} fontWeight={700} fill={MUTED}>
-          ACT NOW
-        </text>
-        <text x={sx(xMax - 1)} y={sy(22)} textAnchor="end" fontSize={13} fontWeight={700} fill={MUTED}>
-          PLAN A DEEP DIVE
-        </text>
-        <text x={sx(1)} y={sy(102)} dy="0.8em" textAnchor="start" fontSize={13} fontWeight={700} fill={MUTED}>
-          REPLY FAST
-        </text>
-        <text x={sx(1)} y={sy(22)} textAnchor="start" fontSize={13} fontWeight={700} fill={MUTED}>
-          PARK OR PASS
-        </text>
-
-        {/* bubbles */}
-        {rows.map((row) => (
-          <g
-            key={row.company_id}
-            className="cursor-pointer outline-none focus-visible:[&>path]:stroke-ring focus-visible:[&>path]:stroke-3"
-            transform={`translate(${sx(row.x)},${sy(row.y)})`}
-            role="link"
-            tabIndex={0}
-            aria-label={`${row.Company}: score ${row["Score %"]}, urgency ${row.Urgency}, ${row.Source}, ${row.Quadrant}. Open the deal.`}
-            onMouseEnter={() => setHovered(row)}
-            onMouseLeave={() => setHovered(null)}
-            onFocus={() => setHovered(row)}
-            onBlur={() => setHovered(null)}
-            onClick={() => open(row)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                open(row);
-              }
-            }}
-          >
-            <path
-              d={symbolPath(row.Source, symbolArea(row.Touchpoints))}
-              fill={row.Source === "Warm intro" ? WARM : COLD}
-              fillOpacity={0.85}
-              stroke="#fbfaf8"
-              strokeWidth={1.5}
+          <ScatterChart margin={{ top: 8, right: 16, bottom: 28, left: 0 }}>
+            {zones.map((zone) => (
+              <ReferenceArea
+                key={zone.key}
+                x1={zone.x1}
+                x2={zone.x2}
+                y1={zone.y1}
+                y2={zone.y2}
+                fill={QUADRANT_COLOURS[zone.key]}
+                fillOpacity={0.06}
+                stroke="none"
+                label={{
+                  value: zone.name.toUpperCase(),
+                  position: zone.position as "insideTopLeft",
+                  fill: QUADRANT_COLOURS[zone.key],
+                  className: "text-[11px] font-semibold tracking-wider",
+                }}
+              />
+            ))}
+            <CartesianGrid strokeDasharray="2 4" strokeOpacity={0.6} />
+            <XAxis
+              type="number"
+              dataKey="x"
+              name="Importance Score"
+              domain={[xLow, xHigh]}
+              ticks={xTicks}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(value: number) => `${value} %`}
+              label={{
+                value: "Importance Score",
+                position: "insideBottom",
+                offset: -18,
+                className: "fill-muted-foreground text-xs",
+              }}
             />
-          </g>
-        ))}
-
-        {/* the six highest-priority deals, labels alternating above and below */}
-        {labelled.map((row, index) => (
-          <text
-            key={`label-${row.company_id}`}
-            x={sx(row.x) + 9}
-            y={sy(row.y) + (index % 2 === 0 ? -9 : 11)}
-            dy="0.32em"
-            fontSize={12}
-            fontWeight={600}
-            fill={INK}
-            pointerEvents="none"
-          >
-            {row.Company}
-          </text>
-        ))}
-
-        {/* size legend */}
-        <text x={MARGIN.left} y={legendY - 14} fontSize={12} fontWeight={700} fill={INK}>
-          Touchpoints
-        </text>
-        {[1, 2, 3, 4, 5].map((value, index) => (
-          <g key={value} transform={`translate(${MARGIN.left + 14 + index * 56},${legendY + 6})`}>
-            <path d={symbolPath("Cold inbound", symbolArea(value))} fill="#9a948c" stroke="#9a948c" />
-            <text x={16} dy="0.32em" fontSize={12} fill={INK}>
-              {value}
-            </text>
-          </g>
-        ))}
-      </svg>
-      {hovered ? (
-        <div
-          className="pointer-events-none absolute z-10 rounded-md border bg-popover px-2.5 py-2 text-[13px] leading-normal whitespace-nowrap text-popover-foreground shadow-md"
-          style={{
-            left: `${(sx(hovered.x) / WIDTH) * 100}%`,
-            top: `${(sy(hovered.y) / HEIGHT) * 100}%`,
-            transform: sx(hovered.x) > WIDTH * 0.65 ? "translate(calc(-100% - 14px), -50%)" : "translate(14px, -50%)",
-          }}
-          role="status"
-        >
-          <dl>
-            {(["Company", "Quadrant", "Score %", "Urgency", "Touchpoints", "Source", "Next action", "Owner"] as const).map(
-              (field) => (
-                <div key={field}>
-                  <dt className="inline text-muted-foreground">{field}</dt>
-                  <dd className="ml-1 inline font-semibold">{hovered[field]}</dd>
-                </div>
-              ),
-            )}
-          </dl>
-        </div>
-      ) : null}
-    </div>
+            <YAxis
+              type="number"
+              dataKey="y"
+              name="Urgency Score"
+              domain={Y_DOMAIN}
+              ticks={[20, 40, 60, 80, 100]}
+              tickLine={false}
+              axisLine={false}
+              width={44}
+              label={{
+                value: "Urgency Score",
+                angle: -90,
+                position: "insideLeft",
+                offset: 6,
+                className: "fill-muted-foreground text-xs",
+              }}
+            />
+            {/* Recharts reads ``range`` as the symbol's area in px²: touchpoints 1–5 → 70–420. */}
+            <ZAxis type="number" dataKey="Touchpoints" domain={[1, 5]} range={[70, 420]} />
+            <ReferenceLine x={scoreSplit} stroke="var(--muted-foreground)" strokeDasharray="4 4" />
+            <ReferenceLine y={urgencySplit} stroke="var(--muted-foreground)" strokeDasharray="4 4" />
+            <ChartTooltip cursor={false} content={<DealTooltip />} />
+            {series.map(({ key, shape, data }) => (
+              <Scatter
+                key={key}
+                name={CONFIG[key].label}
+                data={data}
+                shape={shape}
+                fill={`var(--color-${key})`}
+                fillOpacity={0.75}
+                stroke="var(--background)"
+                strokeWidth={1.5}
+                className="cursor-pointer"
+                isAnimationActive={false}
+                onClick={(point) => open((point as unknown as { payload?: MatrixRow }).payload)}
+              >
+                <LabelList
+                  dataKey="Company"
+                  content={(props) => {
+                    const { x, y, value, index } = props as { x?: number; y?: number; value?: string; index?: number };
+                    const row = index === undefined ? undefined : data[index];
+                    if (!row || !labelled.has(row.company_id) || x === undefined || y === undefined) return null;
+                    const onRight = row.x < xLow + (xHigh - xLow) * 0.8;
+                    return (
+                      <text
+                        x={Number(x) + (onRight ? 11 : -11)}
+                        y={Number(y)}
+                        dy="0.32em"
+                        textAnchor={onRight ? "start" : "end"}
+                        className="fill-foreground text-xs font-medium"
+                        stroke="var(--background)"
+                        strokeWidth={3}
+                        paintOrder="stroke"
+                        pointerEvents="none"
+                      >
+                        {value}
+                      </text>
+                    );
+                  }}
+                />
+              </Scatter>
+            ))}
+          </ScatterChart>
+        </ChartContainer>
+      </CardContent>
+      <CardFooter className="text-xs text-muted-foreground">
+        Deals with the same score and urgency are spread slightly so none hides another; the tooltip shows the exact
+        values. The highest-priority deals are labelled where there is room.
+      </CardFooter>
+    </Card>
   );
 }

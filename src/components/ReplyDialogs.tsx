@@ -10,7 +10,7 @@ import { useId, useState, type ComponentProps, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FieldDescription, FieldLabel, Field as ShadcnField } from "@/components/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -32,22 +32,25 @@ import { useAction } from "./useAction";
 /** How the button that opens a dialog looks (a shadcn Button's own props). */
 export type TriggerProps = Pick<ComponentProps<typeof Button>, "variant" | "size" | "className">;
 
-/** A labelled form field: the label above its control. */
+/** A labelled form field (shadcn Field): the label above its control, an optional hint below. */
 export function Field({
   label,
+  description,
   children,
   className,
 }: {
   label: string;
+  description?: string;
   children: (id: string) => ReactNode;
   className?: string;
 }) {
   const id = useId();
   return (
-    <div className={className ?? "my-2.5 grid gap-1.5"}>
-      <Label htmlFor={id}>{label}</Label>
+    <ShadcnField className={className ?? "my-3"}>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
       {children(id)}
-    </div>
+      {description ? <FieldDescription>{description}</FieldDescription> : null}
+    </ShadcnField>
   );
 }
 

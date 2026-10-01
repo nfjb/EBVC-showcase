@@ -5,13 +5,15 @@
  * page's list ("3 of 20"), previous / next through the list, and a jump-to search.
  */
 
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronsUpDown, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ButtonGroup } from "@/components/ui/button-group";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { dealHref } from "@/lib/routes";
 
 import { readDealList, readLastDeal, rememberLastDeal, type RememberedList } from "./dealList";
@@ -84,56 +86,81 @@ export function DealNavBar({
     : "";
 
   return (
-    <div className="mb-1.5 grid grid-cols-2 items-center gap-2.5 border-b pb-2.5 lg:grid-cols-[auto_minmax(0,1fr)_auto_auto_minmax(220px,320px)] print:hidden">
-      <Button variant="outline" size="lg" asChild>
+    <div className="mb-6 flex flex-wrap items-center gap-3 print:hidden">
+      <Button variant="outline" asChild>
         <Link href={returnHref} title={`Back to ${returnLabel}`}>
           <ArrowLeft aria-hidden="true" /> {returnLabel}
         </Link>
       </Button>
-      <div className="truncate text-sm text-muted-foreground">
-        {returnLabel} › {position?.title ?? "…"} · <b className="text-foreground">{where}</b>
-      </div>
-      {previousId !== null ? (
-        <Button variant="outline" size="lg" asChild>
-          <Link href={dealHref(previousId, returnHref)} title={byId.get(previousId)?.name}>
+      <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+        {position?.title ?? "…"} · <span className="font-medium text-foreground">{where}</span>
+      </p>
+      <ButtonGroup aria-label="Previous and next deal">
+        {previousId !== null ? (
+          <Button variant="outline" asChild>
+            <Link href={dealHref(previousId, returnHref)} title={byId.get(previousId)?.name}>
+              <ChevronLeft aria-hidden="true" /> Previous
+            </Link>
+          </Button>
+        ) : (
+          <Button variant="outline" disabled>
             <ChevronLeft aria-hidden="true" /> Previous
-          </Link>
-        </Button>
-      ) : (
-        <Button variant="outline" size="lg" disabled>
-          <ChevronLeft aria-hidden="true" /> Previous
-        </Button>
-      )}
-      {nextId !== null ? (
-        <Button variant="outline" size="lg" asChild>
-          <Link href={dealHref(nextId, returnHref)} title={byId.get(nextId)?.name}>
+          </Button>
+        )}
+        {nextId !== null ? (
+          <Button variant="outline" asChild>
+            <Link href={dealHref(nextId, returnHref)} title={byId.get(nextId)?.name}>
+              Next <ChevronRight aria-hidden="true" />
+            </Link>
+          </Button>
+        ) : (
+          <Button variant="outline" disabled>
             Next <ChevronRight aria-hidden="true" />
-          </Link>
-        </Button>
-      ) : (
-        <Button variant="outline" size="lg" disabled>
-          Next <ChevronRight aria-hidden="true" />
-        </Button>
-      )}
-      <Select
-        value=""
-        onValueChange={(value) => {
-          const id = Number(value);
-          if (id) router.push(dealHref(id, returnHref));
-        }}
-      >
-        <SelectTrigger className="h-9 w-full bg-card" aria-label="Jump to a deal">
-          <SelectValue placeholder="Jump to a deal…" />
-        </SelectTrigger>
-        <SelectContent className="max-h-96">
-          {deals.map((deal) => (
-            <SelectItem key={deal.id} value={String(deal.id)}>
-              {deal.name} · {deal.domain || "no website"}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+          </Button>
+        )}
+      </ButtonGroup>
+      <DealJump deals={deals} onPick={(id) => router.push(dealHref(id, returnHref))} />
     </div>
+  );
+}
+
+/** "Jump to a deal": a searchable combobox over every deal, by name or website. */
+function DealJump({ deals, onPick }: { deals: KnownDeal[]; onPick: (id: number) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" aria-expanded={open} className="w-64 justify-between font-normal">
+          <span className="flex items-center gap-2 text-muted-foreground">
+            <Search aria-hidden="true" /> Jump to a deal…
+          </span>
+          <ChevronsUpDown className="opacity-50" aria-hidden="true" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 p-0">
+        <Command>
+          <CommandInput placeholder="Company or website…" />
+          <CommandList>
+            <CommandEmpty>No deal found.</CommandEmpty>
+            <CommandGroup>
+              {deals.map((deal) => (
+                <CommandItem
+                  key={deal.id}
+                  value={`${deal.name} ${deal.domain} ${deal.id}`}
+                  onSelect={() => {
+                    setOpen(false);
+                    onPick(deal.id);
+                  }}
+                >
+                  <span className="truncate">{deal.name}</span>
+                  <span className="ml-auto truncate text-xs text-muted-foreground">{deal.domain || "no website"}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 

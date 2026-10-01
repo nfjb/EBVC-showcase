@@ -12,7 +12,7 @@ import { parseIsoDate, type IsoDate } from "./dates";
 
 export interface TriageConfig {
   demo_today: IsoDate;
-  o1: O1Rules;
+  fathom: FathomRules;
   hard_filters: HardFilterRules;
   queue_flags: { decide_this_week_days: number; decision_required_days: number };
   intro_reply_working_days: number;
@@ -33,8 +33,8 @@ export interface TriageConfig {
   matrix: { score_split: number; urgency_split: number };
 }
 
-/** The O1 Venture investment criteria: weights in %, bands highest first. */
-export interface O1Rules {
+/** The Fathom investment criteria: weights in %, bands highest first. */
+export interface FathomRules {
   scale_max: number;
   weights: Record<string, number>;
   storytelling_bonus_max: number;

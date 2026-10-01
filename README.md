@@ -41,7 +41,7 @@ npm run build && npm start
 | --- | --- |
 | **Cockpit** | My view / Team view / Pipeline / Hot topics. KPI tiles double as quick filters; the table is ranked by score % × urgency; CSV export and a print view for the Monday meeting |
 | **Priority matrix** | Every open, filter-passing deal on score % × urgency, in four quadrants. Click a bubble to open the deal |
-| **Deal detail** | O1 ratings (ten dimensions, 1–5, plus a storytelling bonus) with a live score preview, advance / pass with a drafted reply, warm-intro reply and thank-you, score breakdown, touchpoint history, rank override |
+| **Deal detail** | Fathom ratings (ten dimensions, 1–5, plus a storytelling bonus) with a live score preview, advance / pass with a drafted reply, warm-intro reply and thank-you, score breakdown, touchpoint history, rank override |
 | **Intro tracker** | Warm intros against the three-working-day SLA: day-2 reminder, day-3 escalation to the responsible partner |
 | **Merge queue** | Fuzzy name matches waiting for a person: same company (merge) or different |
 | **Outbox** | Every reply "sent" from the app (simulated: nothing leaves the app) |
@@ -51,11 +51,25 @@ npm run build && npm start
 There is no sign-in in this demo: pick the team member you are acting as in the sidebar.
 Every decision is logged under "<name> (demo)".
 
+## AI rating agent (optional)
+
+The live Fathom agent uses OpenAI, for deals the pre-rated demo data does not cover. Copy `.env.example` to `.env.local`
+(ignored by git), set `OPENAI_API_KEY` and restart `npm run dev`; on Vercel, set it as an
+environment variable. `OPENAI_MODEL` is optional (default `gpt-6.1-sol`).
+
+The key stays on the server: `src/app/api/rate` is the app's only server code, and it stores
+nothing. Only company-level facts are sent (no founder names, email addresses, LinkedIn
+profiles or introducer names). The agent never advances or passes a deal. Without a key,
+deals the bundled file does not cover stay unrated.
+
+Before deploying publicly, put the app behind a password or rate limit: the route spends the
+key's credits for anyone who can reach it.
+
 ## Configuration
 
 All the rules live in `config/` and are bundled into the app (restart `npm run dev` after editing):
 
-- `config/weights.yaml`: the O1 score weights and interpretation bands, hard filters, queue
+- `config/weights.yaml`: the Fathom score weights and interpretation bands, hard filters, queue
   flags, SLA, urgency, cockpit and matrix settings, and the demo's fixed "today" (2026-09-30).
 - `config/thesis.md`: the written fund thesis, for reference. It no longer feeds the score.
 - `config/team.yaml`: the team, their roles and who each escalates to.
@@ -64,7 +78,7 @@ All the rules live in `config/` and are bundled into the app (restart `npm run d
 ## Layout
 
 ```
-config/               the triage rules (O1 weights, team; thesis for reference)
+config/               the triage rules (Fathom weights, team; thesis for reference)
 demo/                 the demo CSVs and their generator (_generate.py)
 src/lib/triage/       the rules, pure: normalise, dedup, filters, scoring, urgency, drafts…
 src/lib/db/           the in-memory store and its queries
@@ -91,13 +105,15 @@ all 2,602 reply drafts, intro states, plus 8,007 Jaro-Winkler pairs, 12,030 roun
 and 1,200 working-day cases.
 
 The one deliberate exception is the score. It no longer follows the Python app's thesis fit,
-market, team, momentum and source quality. It now follows the **O1 Venture investment
-criteria** (Pre-Seed / Seed, March 2026), described in the next section.
+market, team, momentum and source quality. It now follows the **Fathom investment
+criteria**, described in the next section.
 
-### Scoring: the O1 investment criteria
+### Scoring: the Fathom investment criteria
 
-A person rates ten dimensions from 1 (weak) to 5 (strong) on Deal detail; the weights are the
-framework's:
+The **Fathom agent** (an OpenAI model) rates every company on ten dimensions from 1 (weak) to 5
+(strong) right after each upload, and justifies the result in three sentences, shown on Deal
+detail as "Why it ranks here". Anyone can change a rating there; a person's ratings replace
+the agent's and are never overwritten by it. The weights are the framework's:
 
 | Dimension | Weight | Dimension | Weight |
 | --- | --- | --- | --- |
@@ -111,9 +127,25 @@ Score % = sum(weight × rating / 5). Storytelling & design adds 0–5 bonus poin
 capped at 100 %. Once all ten are rated, the score reads as a band: 90+ investable – strong,
 75+ investable with minor gaps, 60+ watchlist, 40+ not investable, below 40 no fit.
 
-Nothing is rated automatically, so every company starts at 0 %. The cockpit then orders
-unrated deals by urgency, and shows "–" in the O1 % column until someone rates them. The
-matrix's score line sits at 60 % (the watchlist line).
+The demo companies come **pre-rated** in `demo/fathom_ratings.json`, so the app opens fully
+rated and never calls OpenAI for them. The ratings were made by Claude, written down as a
+reviewable rubric in `scripts/prerate-demo.ts` (a per-sector assessment of the deck text,
+moved by each company's hires, traction and announced rounds). Rerun it, without any API
+call, when the demo files change:
+
+```bash
+npm run demo:prerate
+```
+
+Companies the file does not cover (any other upload) are rated by the live agent (OpenAI)
+only when someone presses **Rate with the Fathom agent** on Deal flow uploads, since it
+spends credits; a progress bar shows at the top of every page while it runs. A deal nobody has rated yet scores 0 %, shows "–" in
+the cockpit's Importance Score column (the Fathom score %), and is ordered by urgency. The matrix's score line sits at 60 %
+(the watchlist line).
+
+The agent sees company-level information only: deck text, one-liner, stage, round, channels,
+introducer types and the enrichment signals. It rates the team on what the deck and signals
+say about the team (roles, experience, senior hires), never on names or personal attributes.
 
 ### What changed with the move off Lex
 

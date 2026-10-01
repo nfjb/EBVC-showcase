@@ -25,7 +25,8 @@ export type TouchpointFields = Omit<Touchpoint, "id" | "company_id">;
 
 export interface PipelinePlan {
   records: CsvRow[];
-  companies: { fields: CompanyFields; touchpoints: TouchpointFields[] }[];
+  /** Per company: its fields, its records, and the signals known at intake. */
+  companies: { fields: CompanyFields; touchpoints: TouchpointFields[]; signals: CsvRow[] }[];
   suggestions: SuggestedMerge[];
 }
 
@@ -70,9 +71,9 @@ export function buildCompanyFields(
   const roundSizeEur = pyToInt(latestValue(records, "round_size_eur"));
   const deckText = latestValue(records, "deck_text");
   const passCode = hardFilterPassCode(stage, country, roundSizeEur, config.hard_filters);
-  // Every O1 dimension is a person's rating: a new company starts unrated, at 0 %.
+  // Every Fathom dimension is a person's rating: a new company starts unrated, at 0 %.
   const ratings = emptyRatings();
-  const [score, breakdown] = scoreCompany(ratings, config.o1);
+  const [score, breakdown] = scoreCompany(ratings, config.fathom);
   const latestSignal = knownSignals.reduce<CsvRow | null>(
     (latest, signal) => (latest === null || signal.event_date > latest.event_date ? signal : latest),
     null,
@@ -93,6 +94,11 @@ export function buildCompanyFields(
     passed_hard_filters: passCode === "",
     pass_code: passCode,
     ...ratings,
+    rating_source: "",
+    rating_rationale: "",
+    rating_model: "",
+    rated_by: "",
+    rated_at: null,
     score,
     score_breakdown: JSON.stringify(breakdown),
     latest_signal: latestSignal ? describeSignal(latestSignal) : "",
@@ -150,6 +156,7 @@ export function planPipeline(
     return {
       fields: buildCompanyFields(rows, knownSignals, config),
       touchpoints: rows.map(touchpointFields),
+      signals: knownSignals,
     };
   });
   return { records, companies, suggestions };

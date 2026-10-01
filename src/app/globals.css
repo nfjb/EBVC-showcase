@@ -7,7 +7,6 @@
 
 @theme inline {
     --font-heading: var(--font-sans);
-    --font-display: var(--font-display);
     --color-success: var(--success);
     --color-success-foreground: var(--success-foreground);
     --color-warning: var(--warning);
@@ -20,6 +19,10 @@
     --color-warm: var(--warm);
     --color-cold: var(--cold);
     --color-paper: var(--paper);
+    --color-act: var(--act);
+    --color-plan: var(--plan);
+    --color-reply: var(--reply);
+    --color-park: var(--park);
     --font-sans: var(--font-sans);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
@@ -62,30 +65,31 @@
 }
 
 /*
- * Skarv Ventures palette (light only). Colours meet WCAG AA contrast, and status is always
- * written out: colour only reinforces the words.
+ * Skarv Ventures theme: shadcn's neutral palette with Skarv red as the primary colour
+ * (light only). Colours meet WCAG AA contrast, and status is always written out: colour
+ * only reinforces the words.
  */
 :root {
     color-scheme: light;
-    --background: #f4f2ee;
-    --foreground: #16161a;
-    --paper: #fbfaf8;
-    --card: #ffffff;
-    --card-foreground: #16161a;
-    --popover: #ffffff;
-    --popover-foreground: #16161a;
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --paper: oklch(0.985 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
     --primary: #c8102e;
-    --primary-foreground: #ffffff;
-    --secondary: #16161a;
-    --secondary-foreground: #ffffff;
-    --muted: #e9e5df;
-    --muted-foreground: #5f5b55;
-    --accent: #ece8e1;
-    --accent-foreground: #16161a;
-    --destructive: #8a0d22;
-    --border: #e2ddd5;
-    --input: #c9c3ba;
-    --ring: #f2b705;
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.48 0 0);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.87 0 0);
+    --ring: #c8102e;
     --hot: #c8102e;
     --warm: #c8102e;
     --cold: #1f5fb8;
@@ -97,20 +101,25 @@
     --info-foreground: #1d3f75;
     --error: #fbe7e9;
     --error-foreground: #8a0d22;
+    /* Priority-matrix quadrants: Act now, Plan a deep dive, Reply fast, Park or pass. */
+    --act: #c8102e;
+    --plan: #1f5fb8;
+    --reply: #b45309;
+    --park: oklch(0.556 0 0);
     --chart-1: #c8102e;
     --chart-2: #1f5fb8;
-    --chart-3: #5f5b55;
-    --chart-4: #9a948c;
-    --chart-5: #16161a;
-    --radius: 0.5rem;
-    --sidebar: #ece8e1;
-    --sidebar-foreground: #16161a;
-    --sidebar-primary: #16161a;
-    --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: rgb(22 22 26 / 0.06);
-    --sidebar-accent-foreground: #16161a;
-    --sidebar-border: #e2ddd5;
-    --sidebar-ring: #f2b705;
+    --chart-3: oklch(0.556 0 0);
+    --chart-4: oklch(0.708 0 0);
+    --chart-5: oklch(0.205 0 0);
+    --radius: 0.625rem;
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar-primary: oklch(0.205 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.95 0 0);
+    --sidebar-accent-foreground: oklch(0.205 0 0);
+    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-ring: #c8102e;
 }
 
 @layer base {
@@ -126,17 +135,7 @@
   html {
     @apply font-sans;
     }
-  :focus-visible {
-    @apply outline-3 outline-offset-2 outline-ring;
+  a:focus-visible {
+    @apply rounded-sm outline-2 outline-offset-2 outline-ring;
     }
-}
-
-/* The Monday meeting print view: only the list, and the print table opened. */
-@media print {
-  details.print-view {
-    display: block;
-  }
-  details.print-view > summary {
-    display: none;
-  }
 }
