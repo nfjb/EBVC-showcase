@@ -13,6 +13,7 @@ import type { CSSProperties } from "react";
 import { NavigateSelect } from "@/components/CockpitClient";
 import { RememberDealList } from "@/components/dealList";
 import { HeaderActions } from "@/components/HeaderActions";
+import { UrgencyHeader, UrgencyValue } from "@/components/UrgencyScore";
 import { Caption, DataTable, Notice, NUM, PageHeader } from "@/components/page";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -153,7 +154,9 @@ function MatrixBody({
           <TableRow>
             <TableHead>Company</TableHead>
             <TableHead className={NUM}>Importance Score</TableHead>
-            <TableHead className={NUM}>Urgency Score</TableHead>
+            <TableHead className={NUM}>
+              <UrgencyHeader />
+            </TableHead>
             <TableHead className={NUM}>Touch­points</TableHead>
             <TableHead>Source</TableHead>
             <TableHead>Next action</TableHead>
@@ -171,7 +174,9 @@ function MatrixBody({
                 </Link>
               </TableCell>
               <TableCell className={NUM}>{row["Score %"]}</TableCell>
-              <TableCell className={NUM}>{row.Urgency}</TableCell>
+              <TableCell className={NUM}>
+                <UrgencyValue value={row.Urgency} reason={row.urgency_reason} />
+              </TableCell>
               <TableCell className={NUM}>{row.Touchpoints}</TableCell>
               <TableCell>{row.Source}</TableCell>
               <TableCell>{row["Next action"]}</TableCell>

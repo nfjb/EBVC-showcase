@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { ExportControls, NavigateSelect, NextActionPill, type PillAction } from "@/components/CockpitClient";
 import { RememberDealList } from "@/components/dealList";
 import { HeaderActions } from "@/components/HeaderActions";
+import { UrgencyHeader, UrgencyValue } from "@/components/UrgencyScore";
 import { Caption, DataTable, Metric, Metrics, NUM, PageHeader } from "@/components/page";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -288,7 +289,9 @@ function PriorityTable({ lines, actionable, currentHref }: { lines: Line[]; acti
           <TableHead>Company</TableHead>
           <TableHead>Description</TableHead>
           <TableHead className={NUM}>Importance Score</TableHead>
-          <TableHead className={NUM}>Urgency Score</TableHead>
+          <TableHead className={NUM}>
+            <UrgencyHeader />
+          </TableHead>
           <TableHead>Open tasks</TableHead>
           <TableHead>{actionable ? "Next action" : "Assigned to · next step"}</TableHead>
         </TableRow>
@@ -347,8 +350,8 @@ function PriorityTable({ lines, actionable, currentHref }: { lines: Line[]; acti
                   </span>
                 )}
               </TableCell>
-              <TableCell className={cn(NUM, "text-base", line.urgency >= 80 && "font-bold text-hot")}>
-                {line.urgency}
+              <TableCell className={cn(NUM, "text-base")}>
+                <UrgencyValue value={line.urgency} reason={line.urgency_reason} hot={line.urgency >= 80} />
               </TableCell>
               <TableCell className="text-center">
                 <Tooltip>

@@ -86,6 +86,8 @@ export interface MatrixRow {
   Company: string;
   "Score %": number;
   Urgency: number;
+  /** Why the urgency is what it is (tooltip). */
+  urgency_reason: string;
   x: number;
   y: number;
   Touchpoints: number;
@@ -107,6 +109,7 @@ export function matrixRows(lines: Line[]): MatrixRow[] {
       Company: company.name,
       "Score %": line.score_percent,
       Urgency: line.urgency,
+      urgency_reason: line.urgency_reason,
       x: line.score_percent + spread(company.id, 37, 1.6),
       y: line.urgency + spread(company.id, 53, 2.4),
       Touchpoints: company.touchpoint_count,

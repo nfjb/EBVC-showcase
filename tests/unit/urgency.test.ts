@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { loadTriageConfig } from "@/lib/triage/config";
 import { pyRound } from "@/lib/triage/py";
-import { buildLine, quadrant, rankByPriority, urgency, type LineCompany } from "@/lib/triage/urgency";
+import { buildLine, quadrant, rankByPriority, urgency, urgencyReason, type LineCompany } from "@/lib/triage/urgency";
 
 const TODAY = "2026-09-30"; // Wednesday
 const RULES = loadTriageConfig().urgency;
@@ -67,6 +67,27 @@ describe("urgency and priority", () => {
     expect(urgency("2026-09-25", null, TODAY)).toBe(RULES.base + RULES.recent_signal_bonus);
     expect(urgency("2026-08-25", null, TODAY)).toBe(RULES.base + RULES.signal_bonus);
     expect(urgency(null, null, TODAY)).toBe(RULES.base);
+  });
+
+  it("explains each urgency with the same number it computes", () => {
+    const states = [
+      null,
+      { past_deadline: true, escalation: "Escalated to responsible partner", deadline: "2026-09-25", working_days_elapsed: 4 },
+      { past_deadline: false, escalation: "Escalated to responsible partner", deadline: "2026-09-30", working_days_elapsed: 3 },
+      { past_deadline: false, escalation: "Reminder to owner", deadline: "2026-10-01", working_days_elapsed: 2 },
+      { past_deadline: false, escalation: "On track", deadline: "2026-10-02", working_days_elapsed: 0 },
+    ] as const;
+    for (const signal of [null, "2026-09-25", "2026-08-25", "2026-06-01"]) {
+      for (const state of states) {
+        const value = urgency(signal, state, TODAY);
+        expect(urgencyReason(signal, state, TODAY, "LP")).toContain(String(value));
+      }
+    }
+    expect(urgencyReason(null, states[1], TODAY, "LP")).toBe("LP intro reply overdue since Fri 25 Sep → 95.");
+    expect(urgencyReason("2026-08-25", null, TODAY)).toBe(
+      "Base 30 + 15 for a signal in the last 45 days (Tue 25 Aug, 36 days ago) = 45.",
+    );
+    expect(urgencyReason(null, null, TODAY)).toBe("Base 30: no open warm intro and no recent signal.");
   });
 
   it("is score % × urgency", () => {

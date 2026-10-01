@@ -39,8 +39,8 @@ npm run build && npm start
 
 | Page | What it is for |
 | --- | --- |
-| **Cockpit** | My view / Team view / Pipeline / Hot topics. KPI tiles double as quick filters; the table is ranked by score % × urgency; CSV export and a print view for the Monday meeting |
-| **Priority matrix** | Every open, filter-passing deal on score % × urgency, in four quadrants. Click a bubble to open the deal |
+| **Cockpit** | My view / Team view / Pipeline / Hot topics. KPI tiles double as quick filters; the table is ranked by Importance Score × Urgency Score; CSV export and a print view for the Monday meeting |
+| **Priority matrix** | Every open, filter-passing deal on Importance Score × Urgency Score, in four quadrants. Click a bubble to open the deal |
 | **Deal detail** | Fathom ratings (ten dimensions, 1–5, plus a storytelling bonus) with a live score preview, advance / pass with a drafted reply, warm-intro reply and thank-you, score breakdown, touchpoint history, rank override |
 | **Intro tracker** | Warm intros against the three-working-day SLA: day-2 reminder, day-3 escalation to the responsible partner |
 | **Merge queue** | Fuzzy name matches waiting for a person: same company (merge) or different |
@@ -146,6 +146,32 @@ the cockpit's Importance Score column (the Fathom score %), and is ordered by ur
 The agent sees company-level information only: deck text, one-liner, stage, round, channels,
 introducer types and the enrichment signals. It rates the team on what the deck and signals
 say about the team (roles, experience, senior hires), never on names or personal attributes.
+
+### Urgency Score and priority
+
+The **Urgency Score** (0–100) says how pressing a deal is. It comes only from obligations and
+news, never from how long a deal has waited (that only raises the 14/21-day flags). The
+logic is in `src/lib/triage/urgency.ts`; every number is in `config/weights.yaml` → `urgency`.
+
+1. **An open warm intro decides alone** (signals are ignored), by its reply deadline of three
+   working days, weekends skipped. With several open intros, the most recent counts.
+
+   | Warm intro | Urgency Score |
+   | --- | --- |
+   | Past the deadline | 95 |
+   | Day 3: due today, escalated to the responsible partner | 90 |
+   | Day 2: reminder sent to the owner | 80 |
+   | Open, within time | 70 |
+
+2. **Otherwise** a base of **30**, plus a bonus for the latest signal (hire, traction, news,
+   announced round): **+25** if it is from the last 14 days (55), **+15** if from the last 45
+   days (45). Capped at 100. "Today" is the demo's fixed date, 30 Sep 2026.
+
+**Priority** = Importance Score × Urgency Score / 100. The cockpit ranks by priority, then
+Importance Score, then Urgency Score, then name; a rank pinned by a person keeps its place.
+The priority matrix splits Urgency Score at 60, which separates open warm-intro obligations
+(70 and up) from everything else (30–55): "Act now" and "Reply fast" are deals with a warm
+intro waiting for a reply.
 
 ### What changed with the move off Lex
 

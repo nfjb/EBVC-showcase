@@ -7,7 +7,7 @@
  */
 
 import { demoToday, loadTriageConfig } from "./config";
-import { daysBetween, shortWeekday, type IsoDate } from "./dates";
+import { daysBetween, longDate, shortWeekday, type IsoDate } from "./dates";
 import { compareCodePoints, pyGet, pyRound } from "./py";
 import { DECISION_REQUIRED, FATHOM_KEYS, queueFlag } from "./scoring";
 import { ESCALATED, introReplyState, REMINDER_TO_OWNER, type IntroReplyState } from "./workingDays";
@@ -68,6 +68,50 @@ export function urgency(latestSignalAt: IsoDate | null, state: IntroReplyState |
   return Math.min(value, 100);
 }
 
+/**
+ * Why a deal has its urgency, in one line, for the tooltip on the Urgency Score. Follows
+ * {@link urgency} rule for rule, so the explanation always matches the number.
+ */
+export function urgencyReason(
+  latestSignalAt: IsoDate | null,
+  state: IntroReplyState | null,
+  today: IsoDate,
+  introLabel = "Warm",
+): string {
+  const rules = loadTriageConfig().urgency;
+  const value = urgency(latestSignalAt, state, today);
+  if (state !== null) {
+    const intro = `${introLabel} intro`;
+    if (state.past_deadline) return `${intro} reply overdue since ${longDate(state.deadline)} → ${value}.`;
+    if (state.escalation === ESCALATED) return `${intro} reply due today (${longDate(state.deadline)}), escalated to the partner → ${value}.`;
+    if (state.escalation === REMINDER_TO_OWNER) return `${intro} reply due ${longDate(state.deadline)}, reminder sent to the owner → ${value}.`;
+    return `${intro} awaiting a reply, due ${longDate(state.deadline)} → ${value}.`;
+  }
+  if (latestSignalAt !== null) {
+    const age = daysBetween(latestSignalAt, today);
+    const when = `${longDate(latestSignalAt)}, ${age} day${age === 1 ? "" : "s"} ago`;
+    if (age <= rules.recent_signal_days) {
+      return `Base ${rules.base} + ${rules.recent_signal_bonus} for a signal in the last ${rules.recent_signal_days} days (${when}) = ${value}.`;
+    }
+    if (age <= rules.signal_days) {
+      return `Base ${rules.base} + ${rules.signal_bonus} for a signal in the last ${rules.signal_days} days (${when}) = ${value}.`;
+    }
+    return `Base ${rules.base}; the latest signal (${when}) is older than ${rules.signal_days} days.`;
+  }
+  return `Base ${rules.base}: no open warm intro and no recent signal.`;
+}
+
+/** The general rule, for the tooltip on the Urgency Score column header. */
+export function urgencyRule(): string {
+  const rules = loadTriageConfig().urgency;
+  return (
+    `An open warm intro sets it by its reply deadline: overdue ${rules.intro_overdue}, due today ${rules.intro_due_today}, ` +
+    `reminder ${rules.intro_reminder}, open ${rules.intro_open}. Otherwise ${rules.base}, plus ${rules.recent_signal_bonus} for a ` +
+    `signal in the last ${rules.recent_signal_days} days or ${rules.signal_bonus} in the last ${rules.signal_days}. ` +
+    "Time in the queue never counts."
+  );
+}
+
 export type NextActionKind = "deal" | "intro" | "pass_draft" | "merge";
 
 /** Everything the cockpit shows for one company. */
@@ -75,6 +119,8 @@ export interface CockpitLine<C extends LineCompany = LineCompany> {
   company: C;
   score_percent: number;
   urgency: number;
+  /** Why the urgency is what it is, in one line (tooltip). */
+  urgency_reason: string;
   priority: number;
   days_in_queue: number;
   flag: string;
@@ -112,6 +158,12 @@ export function buildLine<C extends LineCompany>(
     company,
     score_percent: percent,
     urgency: urgencyValue,
+    urgency_reason: urgencyReason(
+      company.latest_signal_at,
+      state,
+      day,
+      intro ? pyGet(INTRODUCER_SHORT_LABELS, intro.introducer_type, "Warm") : "Warm",
+    ),
     priority: pyRound((percent * urgencyValue) / 100, 1),
     days_in_queue: waiting,
     flag,

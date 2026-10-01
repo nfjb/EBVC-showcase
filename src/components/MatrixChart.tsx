@@ -111,6 +111,7 @@ function DealTooltip({ active, payload }: { active?: boolean; payload?: { payloa
           </div>
         ))}
       </dl>
+      <p className="max-w-60 border-t pt-1.5 text-muted-foreground">{row.urgency_reason}</p>
     </div>
   );
 }
