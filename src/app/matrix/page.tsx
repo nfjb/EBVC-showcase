@@ -68,7 +68,7 @@ export default function MatrixPage() {
       <PageHeader
         title="Priority matrix"
         eyebrow="Importance Score × Urgency Score"
-        description="Every open deal that passed the hard filters, placed by Importance Score (the Fathom rating) and Urgency Score. Deals nobody has rated yet sit at 0 %. Time in queue is not part of either axis."
+        description="Every open deal that passed the hard filters, placed by Importance Score (the Fathom rating) and Urgency Score. Time in queue is not part of either axis."
       />
       <HeaderActions>
         <NavigateSelect
@@ -218,7 +218,7 @@ function MatrixBody({
                 <ImportanceValue company={companies.get(row.company_id) ?? {}} />
               </TableCell>
               <TableCell className={NUM}>
-                <UrgencyValue value={row.Urgency} reason={row.urgency_reason} />
+                <UrgencyValue breakdown={row.urgency_breakdown} />
               </TableCell>
               <TableCell className={NUM}>
                 <TotalValue importance={row["Score %"]} urgency={row.Urgency} total={row.Priority} />

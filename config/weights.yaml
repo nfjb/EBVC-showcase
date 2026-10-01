@@ -57,29 +57,59 @@ suggested_merge_similarity: 0.92
 
 worklist_size: 20
 
-# Urgency (0-100) orders the cockpit together with the score: priority = score % x urgency.
-# It comes only from obligations and news, never from days in queue (user decision
-# 2026-09-30): an open warm intro sets it by its reply-deadline stage; otherwise the base
-# value plus a bonus for a recent signal.
+# Urgency Score: how pressing a deal is, built like the LP scoring matrix: five dimensions
+# with point tables, a raw sum out of 120, normalised to 0–100 (round(raw / 120 × 100)) and
+# reported as both, e.g. "77/100 (raw 92/120)". Priority = Importance Score × Urgency Score.
+# Time in queue is never an input (user decision 2026-09-30): it only raises the 14/21-day flags.
 urgency:
-  base: 30
-  intro_overdue: 95
-  intro_due_today: 90
-  intro_reminder: 80
-  intro_open: 70
-  recent_signal_days: 14
-  recent_signal_bonus: 25
-  signal_days: 45
-  signal_bonus: 15
+  # 1. Reply obligation (0–40): an open warm intro, by its reply-deadline stage.
+  reply_obligation:
+    overdue: 40
+    due_today: 36
+    reminder: 30
+    open: 24
+    none: 0
+  # 2. Relationship proximity (0–20): how close the founder is to the team.
+  relationship:
+    warm_intro: 20       # introduced by an LP, a portfolio founder or an angel
+    repeat_contact: 10   # reached out on two or more channels
+    cold: 4              # a single cold inbound: identifiable, but no relationship
+  # 3. Activity signal (0–25): how recent the latest signal (hire, traction, news, round) is.
+  activity:
+    - { days: 14, points: 25 }
+    - { days: 45, points: 16 }
+    - { days: 90, points: 8 }
+    - { days: 180, points: 3 }
+  # 4. Competitive pressure (0–20): what the latest signal says, if it is recent enough.
+  competitive_pressure_days: 90
+  competitive_pressure:
+    round_announced: 20  # another lead may be closing the round: decide or lose it
+    traction_update: 14
+    senior_hire: 10
+    news: 6
+  # 5. Founder momentum (0–15): how recently the founder last got in touch.
+  momentum:
+    - { days: 7, points: 15 }
+    - { days: 21, points: 8 }
+  # Tiers on the normalised score, highest first, with what to do.
+  tiers:
+    - { min: 80, label: "Act today", action: "Reply or decide today; something is overdue or about to be lost." }
+    - { min: 60, label: "This week", action: "Put it on this week's list." }
+    - { min: 40, label: "Soon", action: "Look at it once this week's urgent deals are done." }
+    - { min: 20, label: "Monitor", action: "Nothing pressing; watch for new signals." }
+    - { min: 0, label: "No rush", action: "No obligation and no recent news." }
 
 # Cockpit quick filters.
 cockpit:
   new_startup_days: 7
+  # Hot topics: signals from the last this-many days.
+  hot_topic_days: 45
   long_tracking_days: 90
 
-# Priority matrix: where the quadrant lines sit (Fathom score % and urgency, both 0-100).
-# Score split 60 is the Fathom watchlist line; urgency 60 separates open warm-intro
-# obligations (70+) from the rest.
+# Priority matrix: where the quadrant lines sit (Importance and Urgency Score, both 0-100).
+# Score split 60 is the Fathom watchlist line; urgency split 40 is where the "Soon" tier
+# starts: in the demo data it puts every open warm intro (49 and up) on the urgent side, and
+# the rest (3–42) below it unless a very fresh, strong signal lifts it over.
 matrix:
   score_split: 60
-  urgency_split: 60
+  urgency_split: 40

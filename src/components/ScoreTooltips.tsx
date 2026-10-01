@@ -11,33 +11,58 @@ import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 
+import { ScoreHint } from "./ScoreHint";
+
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { loadTriageConfig } from "@/lib/triage/config";
 import { pyFixed } from "@/lib/triage/py";
 import { FATHOM_DIMENSIONS, ratedCount, ratingsOf, scoreBand, scoreCompany } from "@/lib/triage/scoring";
 import type { SortColumn, SortState } from "@/lib/triage/sorting";
-import { urgencyRule } from "@/lib/triage/urgency";
+import { urgencyRule, urgencySummary, type UrgencyBreakdown } from "@/lib/triage/urgency";
 import { cn } from "@/lib/utils";
 
-export function UrgencyValue({ value, reason, hot = false }: { value: number; reason: string; hot?: boolean }) {
+export function UrgencyValue({ breakdown, hot = false }: { breakdown: UrgencyBreakdown; hot?: boolean }) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span
-          tabIndex={0}
-          className={cn(
-            "cursor-help underline decoration-muted-foreground/40 decoration-dotted underline-offset-4",
-            hot && "font-bold text-hot",
-          )}
-          aria-label={`Urgency Score ${value}: ${reason}`}
-        >
-          {value}
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="left" className="block max-w-72">
-        {reason}
-      </TooltipContent>
-    </Tooltip>
+    <ScoreHint
+      label={`Urgency Score ${urgencySummary(breakdown)}`}
+      className={cn(
+        "cursor-help underline decoration-muted-foreground/40 decoration-dotted underline-offset-4",
+        hot && "font-bold text-hot",
+      )}
+      contentClassName="w-96"
+      trigger={breakdown.score}
+    >
+      <div className="mb-1.5 font-semibold">
+        {breakdown.score}/100{" "}
+        <span className="font-normal opacity-70">
+          (raw {breakdown.raw}/{breakdown.max_raw})
+        </span>{" "}
+        · {breakdown.tier.label}
+      </div>
+      <table className="w-full tabular-nums">
+        <tbody>
+          {breakdown.rows.map((row) => (
+            <tr key={row.dimension} className="align-top">
+              <td className="py-0.5 pr-3">
+                <div className="whitespace-nowrap">{row.label}</div>
+                <div className="opacity-70">{row.note}</div>
+              </td>
+              <td className="py-0.5 text-right font-medium whitespace-nowrap">
+                {row.points}
+                <span className="font-normal opacity-60">/{row.max}</span>
+              </td>
+            </tr>
+          ))}
+          <tr className="border-t border-border">
+            <td className="pt-1 font-semibold">Raw sum → Urgency Score</td>
+            <td className="pt-1 text-right font-semibold whitespace-nowrap">
+              {breakdown.raw} → {breakdown.score}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div className="mt-1.5 opacity-80">{breakdown.tier.action}</div>
+    </ScoreHint>
   );
 }
 
@@ -61,48 +86,42 @@ export function ImportanceValue({ company }: { company: object }) {
     );
   }
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span
-          tabIndex={0}
-          className="cursor-help underline decoration-muted-foreground/40 decoration-dotted underline-offset-4"
-          aria-label={`Importance Score ${pyFixed(score, 0)}: ${band}`}
-        >
-          {pyFixed(score, 0)}
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="left" className="block w-80 max-w-none p-3">
-        <div className="mb-1.5 font-semibold">
-          {pyFixed(score, 1)} % · {band}
-        </div>
-        <table className="w-full tabular-nums">
-          <tbody>
-            {breakdown.map((row) => (
-              <tr key={row.component}>
-                <td className="py-px pr-3 whitespace-nowrap">{labels[row.component]}</td>
-                <td className="py-px pr-3 text-right whitespace-nowrap opacity-70">
-                  {row.value === null
-                    ? "–"
-                    : row.weight
-                      ? `${row.value}/${fathom.scale_max} × ${row.weight} %`
-                      : `+${row.value}`}
-                </td>
-                <td className="py-px text-right font-medium whitespace-nowrap">{pyFixed(row.points, 1)}</td>
-              </tr>
-            ))}
-            <tr className="border-t border-background/30">
-              <td className="pt-1 font-semibold" colSpan={2}>
-                Importance Score
+    <ScoreHint
+      label={`Importance Score ${pyFixed(score, 0)}: ${band}`}
+      className="cursor-help underline decoration-muted-foreground/40 decoration-dotted underline-offset-4"
+      contentClassName="w-80"
+      trigger={pyFixed(score, 0)}
+    >
+      <div className="mb-1.5 font-semibold">
+        {pyFixed(score, 1)} % · {band}
+      </div>
+      <table className="w-full tabular-nums">
+        <tbody>
+          {breakdown.map((row) => (
+            <tr key={row.component}>
+              <td className="py-px pr-3 whitespace-nowrap">{labels[row.component]}</td>
+              <td className="py-px pr-3 text-right whitespace-nowrap opacity-70">
+                {row.value === null
+                  ? "–"
+                  : row.weight
+                    ? `${row.value}/${fathom.scale_max} × ${row.weight} %`
+                    : `+${row.value}`}
               </td>
-              <td className="pt-1 text-right font-semibold">{pyFixed(score, 1)}</td>
+              <td className="py-px text-right font-medium whitespace-nowrap">{pyFixed(row.points, 1)}</td>
             </tr>
-          </tbody>
-        </table>
-        <div className="mt-1.5 opacity-80">
-          {source === "person" ? "Ratings set by a person." : source === "agent" ? "Rated by the Fathom agent." : ""}
-        </div>
-      </TooltipContent>
-    </Tooltip>
+          ))}
+          <tr className="border-t border-border">
+            <td className="pt-1 font-semibold" colSpan={2}>
+              Importance Score
+            </td>
+            <td className="pt-1 text-right font-semibold">{pyFixed(score, 1)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div className="mt-1.5 opacity-80">
+        {source === "person" ? "Ratings set by a person." : source === "agent" ? "Rated by the Fathom agent." : ""}
+      </div>
+    </ScoreHint>
   );
 }
 
@@ -130,13 +149,17 @@ function ScoreHeader({
   const Arrow = !active ? ArrowUpDown : sort.direction === "asc" ? ArrowUp : ArrowDown;
   return (
     <span className="inline-flex items-center gap-0.5">
-      <Button variant="ghost" size="sm" className="-mr-1 h-7 px-1.5 font-medium" asChild>
+      <Button variant="ghost" size="sm" className="-mr-1 h-auto px-1.5 py-1 font-medium" asChild>
         <Link
           href={sortHref}
           scroll={false}
           aria-label={`Sort by ${label}${active ? (sort.direction === "asc" ? ", now ascending" : ", now descending") : ""}`}
         >
-          {label}
+          {/* Two lines ("Importance" over "Score") keep the number columns narrow. */}
+          <span className="flex flex-col items-end leading-tight">
+            <span>{label.split(" ")[0]}</span>
+            <span className="text-xs font-normal text-muted-foreground">{label.split(" ").slice(1).join(" ")}</span>
+          </span>
           <Arrow className={cn("size-3.5", !active && "text-muted-foreground/60")} aria-hidden="true" />
         </Link>
       </Button>
@@ -203,21 +226,14 @@ export function TotalHeader({ sort, sortHref }: { sort: SortState; sortHref: str
 export function TotalValue({ importance, urgency, total }: { importance: number; urgency: number; total: number }) {
   const text = `${importance} × ${urgency} / 100 = ${pyFixed(total, 1)}`;
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span
-          tabIndex={0}
-          className="cursor-help font-semibold underline decoration-muted-foreground/40 decoration-dotted underline-offset-4"
-          aria-label={`Total Score ${pyFixed(total, 1)}: ${text}`}
-        >
-          {pyFixed(total, 1)}
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="left" className="block">
-        Importance Score × Urgency Score / 100
-        <br />
-        {text}
-      </TooltipContent>
-    </Tooltip>
+    <ScoreHint
+      label={`Total Score ${pyFixed(total, 1)}: ${text}`}
+      className="cursor-help font-semibold underline decoration-muted-foreground/40 decoration-dotted underline-offset-4"
+      trigger={pyFixed(total, 1)}
+    >
+      Importance Score × Urgency Score / 100
+      <br />
+      {text}
+    </ScoreHint>
   );
 }

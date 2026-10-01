@@ -20,6 +20,7 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
+import { DECISION_KIND_LABELS, label } from "@/lib/triage/labels";
 import { cn } from "@/lib/utils";
 
 import { Caption, DataTable } from "./page";
@@ -122,6 +123,7 @@ export function AuditTable({ rows }: { rows: AuditRow[] }) {
           label="Decision"
           placeholder="All decisions"
           options={sortedUnique(rows.map((row) => row.decision))}
+          format={(code) => label(DECISION_KIND_LABELS, code)}
           selected={kinds}
           onChange={setKinds}
         />
@@ -143,7 +145,7 @@ export function AuditTable({ rows }: { rows: AuditRow[] }) {
               <TableCell className="align-top">{row.when}</TableCell>
               <TableCell className="align-top">{row.who}</TableCell>
               <TableCell className="align-top">{row.company}</TableCell>
-              <TableCell className="align-top">{row.decision}</TableCell>
+              <TableCell className="align-top">{label(DECISION_KIND_LABELS, row.decision)}</TableCell>
               <TableCell className="align-top">{row.passReason}</TableCell>
               <TableCell className="align-top whitespace-normal">{row.comment}</TableCell>
             </TableRow>

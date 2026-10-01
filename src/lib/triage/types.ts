@@ -53,6 +53,8 @@ export interface Company {
   score_breakdown: string;
   latest_signal: string;
   latest_signal_at: IsoDate | null;
+  /** senior_hire, traction_update, round_announced or news ("" without a signal). */
+  latest_signal_type: string;
   rank_override: number | null;
   rank_override_comment: string;
 }

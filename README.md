@@ -149,29 +149,29 @@ say about the team (roles, experience, senior hires), never on names or personal
 
 ### Urgency Score and priority
 
-The **Urgency Score** (0–100) says how pressing a deal is. It comes only from obligations and
-news, never from how long a deal has waited (that only raises the 14/21-day flags). The
-logic is in `src/lib/triage/urgency.ts`; every number is in `config/weights.yaml` → `urgency`.
+The **Urgency Score** says how pressing a deal is. It is built like the LP scoring matrix:
+five dimensions with point tables, a raw sum out of 120, normalised to 0–100 and always
+reported both ways, e.g. `63/100 (raw 75/120)`. It comes from obligations, relationships and
+news, never from how long a deal has waited (that only raises the 14/21-day flags). The logic
+is in `src/lib/triage/urgency.ts`; every number is in `config/weights.yaml` → `urgency`.
 
-1. **An open warm intro decides alone** (signals are ignored), by its reply deadline of three
-   working days, weekends skipped. With several open intros, the most recent counts.
+| Dimension | Max | Points |
+| --- | --- | --- |
+| Reply obligation | 40 | open warm intro overdue 40, due today 36, reminder 30, open 24; none 0 |
+| Relationship proximity | 20 | warm intro 20, contact on two or more channels 10, a single cold inbound 4 |
+| Activity signal | 25 | latest signal within 14 days 25, 45 days 16, 90 days 8, 180 days 3 |
+| Competitive pressure | 20 | latest signal (within 90 days): round announced by another lead 20, traction 14, senior hire 10, news 6 |
+| Founder momentum | 15 | latest inbound within 7 days 15, 21 days 8 |
 
-   | Warm intro | Urgency Score |
-   | --- | --- |
-   | Past the deadline | 95 |
-   | Day 3: due today, escalated to the responsible partner | 90 |
-   | Day 2: reminder sent to the owner | 80 |
-   | Open, within time | 70 |
+`Urgency Score = round(raw / 120 × 100)`. Tiers: 80+ act today, 60–79 this week, 40–59 soon,
+20–39 monitor, below 20 no rush. No score is ever 0: a single cold inbound scores 4 raw.
 
-2. **Otherwise** a base of **30**, plus a bonus for the latest signal (hire, traction, news,
-   announced round): **+25** if it is from the last 14 days (55), **+15** if from the last 45
-   days (45). Capped at 100. "Today" is the demo's fixed date, 30 Sep 2026.
+**Priority** (the Total Score column) = Importance Score × Urgency Score / 100. The cockpit
+ranks by priority, then Importance Score, then Urgency Score, then name; a rank pinned by a
+person keeps its place. The priority matrix splits Urgency Score at 40, where the "Soon" tier
+starts: open warm intros land above it.
 
-**Priority** = Importance Score × Urgency Score / 100. The cockpit ranks by priority, then
-Importance Score, then Urgency Score, then name; a rank pinned by a person keeps its place.
-The priority matrix splits Urgency Score at 60, which separates open warm-intro obligations
-(70 and up) from everything else (30–55): "Act now" and "Reply fast" are deals with a warm
-intro waiting for a reply.
+The page **How scores work** in the app explains both scores in full, with live examples.
 
 ### What changed with the move off Lex
 

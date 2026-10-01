@@ -22,11 +22,12 @@ import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/compon
 import { useCrm } from "@/components/useCrm";
 import * as repo from "@/lib/db/repository";
 import { dealHref } from "@/lib/routes";
-import { loadTriageConfig } from "@/lib/triage/config";
+import { cockpitLines } from "@/lib/crm/views";
+import { demoToday, loadTriageConfig } from "@/lib/triage/config";
 import { DIMENSION_GUIDE, SCALE_GUIDE } from "@/lib/triage/fathomGuide";
 import { pyFixed } from "@/lib/triage/py";
 import { FATHOM_DIMENSIONS, ratedCount, ratingsOf, scoreBand, scoreCompany } from "@/lib/triage/scoring";
-import { QUADRANTS, type QuadrantKey } from "@/lib/triage/urgency";
+import { maxUrgencyRaw, QUADRANTS, urgencySummary, type QuadrantKey } from "@/lib/triage/urgency";
 
 const SECTIONS = [
   { id: "importance", title: "Importance Score" },
@@ -311,81 +312,107 @@ export default function ScoringPage() {
       <Section
         id="urgency"
         title="Urgency Score"
-        description="How pressing a deal is, from 0 to 100. It comes only from obligations and news; how long a deal has waited never counts (that only raises the 14- and 21-day flags)."
+        description="How pressing a deal is, built like the LP scoring matrix: five dimensions with point tables, a raw sum normalised to 0–100. It comes from obligations, relationships and news; how long a deal has waited never counts (that only raises the 14- and 21-day flags)."
       >
+        <Card>
+          <CardHeader>
+            <CardTitle>The formula</CardTitle>
+            <CardDescription>
+              Always reported both ways, so a score can be audited back to its dimensions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <Formula>
+              raw = reply obligation + relationship + activity signal + competitive pressure + founder momentum (max{" "}
+              {maxUrgencyRaw()})
+              <br />
+              Urgency Score = round( raw / {maxUrgencyRaw()} × 100 ) → e.g. &ldquo;63/100 (raw 75/{maxUrgencyRaw()}
+              )&rdquo;
+            </Formula>
+          </CardContent>
+        </Card>
+
         <div className="grid gap-4 lg:grid-cols-2">
+          <PointsCard
+            title={`1 · Reply obligation (0–${Math.max(...Object.values(urgency.reply_obligation))})`}
+            description={`An open warm intro, by its reply deadline of ${config.intro_reply_working_days} working days (weekends skipped). With several, the most recent counts.`}
+            rows={[
+              ["Past the deadline", urgency.reply_obligation.overdue],
+              ["Day 3: due today, escalated to the responsible partner", urgency.reply_obligation.due_today],
+              ["Day 2: reminder sent to the owner", urgency.reply_obligation.reminder],
+              ["Open, within time", urgency.reply_obligation.open],
+              ["No open warm intro", urgency.reply_obligation.none],
+            ]}
+          />
+          <PointsCard
+            title={`2 · Relationship proximity (0–${Math.max(...Object.values(urgency.relationship))})`}
+            description="How close the founder is to the team."
+            rows={[
+              ["Warm intro from an LP, a portfolio founder or an angel", urgency.relationship.warm_intro],
+              ["Reached out on two or more channels", urgency.relationship.repeat_contact],
+              ["A single cold inbound", urgency.relationship.cold],
+            ]}
+          />
+          <PointsCard
+            title={`3 · Activity signal (0–${Math.max(...urgency.activity.map((band) => band.points))})`}
+            description="How recent the latest signal is: a hire, traction, news or an announced round."
+            rows={[
+              ...urgency.activity.map((band) => [`In the last ${band.days} days`, band.points] as [string, number]),
+              ["Older, or no signal", 0],
+            ]}
+          />
+          <PointsCard
+            title={`4 · Competitive pressure (0–${Math.max(...Object.values(urgency.competitive_pressure))})`}
+            description={`What the latest signal says, if it is from the last ${urgency.competitive_pressure_days} days. A round announced by another lead means deciding now or losing the deal.`}
+            rows={[
+              ["A round announced by another lead", urgency.competitive_pressure.round_announced ?? 0],
+              ["A traction update", urgency.competitive_pressure.traction_update ?? 0],
+              ["A senior hire", urgency.competitive_pressure.senior_hire ?? 0],
+              ["News", urgency.competitive_pressure.news ?? 0],
+              [`No signal, or older than ${urgency.competitive_pressure_days} days`, 0],
+            ]}
+          />
+          <PointsCard
+            title={`5 · Founder momentum (0–${Math.max(...urgency.momentum.map((band) => band.points))})`}
+            description="How recently the founder last got in touch: the latest inbound, never the first one, so waiting in the queue cannot raise it."
+            rows={[
+              ...urgency.momentum.map(
+                (band) => [`Latest inbound in the last ${band.days} days`, band.points] as [string, number],
+              ),
+              ["Longer ago", 0],
+            ]}
+          />
           <Card>
             <CardHeader>
-              <CardTitle>1 · An open warm intro decides alone</CardTitle>
-              <CardDescription>
-                Warm intros get a reply within {config.intro_reply_working_days} working days, weekends skipped. With
-                several open intros, the most recent counts; signals are then ignored.
-              </CardDescription>
+              <CardTitle>Tiers</CardTitle>
+              <CardDescription>On the normalised score, with what to do.</CardDescription>
             </CardHeader>
             <CardContent>
               <DataTable>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Warm intro</TableHead>
-                    <TableHead className={NUM}>Urgency Score</TableHead>
+                    <TableHead>Urgency Score</TableHead>
+                    <TableHead>Tier</TableHead>
+                    <TableHead>Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {[
-                    ["Past the deadline", urgency.intro_overdue],
-                    ["Day 3: due today, escalated to the responsible partner", urgency.intro_due_today],
-                    ["Day 2: reminder sent to the owner", urgency.intro_reminder],
-                    ["Open, within time", urgency.intro_open],
-                  ].map(([stage, value]) => (
-                    <TableRow key={stage}>
-                      <TableCell className="whitespace-normal">{stage}</TableCell>
-                      <TableCell className={NUM}>{value}</TableCell>
+                  {urgency.tiers.map((tier, index) => (
+                    <TableRow key={tier.label}>
+                      <TableCell className="tabular-nums">
+                        {tier.min}–{index === 0 ? 100 : urgency.tiers[index - 1].min - 1}
+                      </TableCell>
+                      <TableCell className="font-medium">{tier.label}</TableCell>
+                      <TableCell className="whitespace-normal text-muted-foreground">{tier.action}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </DataTable>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>2 · Otherwise: base plus news</CardTitle>
-              <CardDescription>
-                The latest signal (a hire, traction, news or an announced round) adds a bonus.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DataTable>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Latest signal</TableHead>
-                    <TableHead className={NUM}>Urgency Score</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell className="whitespace-normal">In the last {urgency.recent_signal_days} days</TableCell>
-                    <TableCell className={NUM}>
-                      {urgency.base} + {urgency.recent_signal_bonus} = {urgency.base + urgency.recent_signal_bonus}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="whitespace-normal">In the last {urgency.signal_days} days</TableCell>
-                    <TableCell className={NUM}>
-                      {urgency.base} + {urgency.signal_bonus} = {urgency.base + urgency.signal_bonus}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="whitespace-normal">Older, or none</TableCell>
-                    <TableCell className={NUM}>{urgency.base}</TableCell>
-                  </TableRow>
-                </TableBody>
-              </DataTable>
-              <p className="mt-3 text-xs text-muted-foreground">
-                Capped at 100. &ldquo;Today&rdquo; is the demo&apos;s fixed date, {config.demo_today}.
-              </p>
-            </CardContent>
-          </Card>
         </div>
+
+        <UrgencyExample />
       </Section>
 
       {/* ── Priority ─────────────────────────────────────────────────────────── */}
@@ -413,7 +440,7 @@ export default function ScoringPage() {
               <CardTitle>The four quadrants</CardTitle>
               <CardDescription>
                 Split at Importance Score {matrix.score_split} % (the watchlist line) and Urgency Score{" "}
-                {matrix.urgency_split} (open warm intros score 70 and up, everything else 30–55).
+                {matrix.urgency_split}, where the &ldquo;Soon&rdquo; tier starts (open warm intros land above it).
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-2 sm:grid-cols-2">
@@ -523,6 +550,89 @@ function WorkedExample({ labels }: { labels: Record<string, string> }) {
             {company.rating_rationale}
           </blockquote>
         ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PointsCard({ title, description, rows }: { title: string; description: string; rows: [string, number][] }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <DataTable>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Signal</TableHead>
+              <TableHead className={NUM}>Points</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map(([label, points]) => (
+              <TableRow key={label}>
+                <TableCell className="whitespace-normal">{label}</TableCell>
+                <TableCell className={NUM}>{points}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </DataTable>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** A live example: the most urgent open deal right now, dimension by dimension. */
+function UrgencyExample() {
+  const line = cockpitLines(demoToday())
+    .filter((candidate) => candidate.company.status === "open" && candidate.company.passed_hard_filters)
+    .sort((a, b) => b.urgency - a.urgency)[0];
+  if (!line) return null;
+  const breakdown = line.urgency_breakdown;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          Example:{" "}
+          <Link className="hover:underline" href={dealHref(line.company.id, "/scoring")}>
+            {line.company.name}
+          </Link>
+        </CardTitle>
+        <CardDescription>
+          The most urgent open deal right now: {urgencySummary(breakdown)}. {breakdown.tier.action}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <DataTable>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Dimension</TableHead>
+              <TableHead>Why</TableHead>
+              <TableHead className={NUM}>Points</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {breakdown.rows.map((row) => (
+              <TableRow key={row.dimension}>
+                <TableCell>{row.label}</TableCell>
+                <TableCell className="whitespace-normal text-muted-foreground">{row.note}</TableCell>
+                <TableCell className={NUM}>
+                  {row.points} / {row.max}
+                </TableCell>
+              </TableRow>
+            ))}
+            <TableRow className="font-semibold hover:bg-transparent">
+              <TableCell colSpan={2}>
+                Raw sum → round({breakdown.raw} / {breakdown.max_raw} × 100)
+              </TableCell>
+              <TableCell className={NUM}>
+                {breakdown.raw} → {breakdown.score}
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </DataTable>
       </CardContent>
     </Card>
   );

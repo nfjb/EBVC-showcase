@@ -6,7 +6,14 @@
 import { loadTriageConfig, responsiblePartners, teamRoles } from "./config";
 import { pyGet } from "./py";
 import type { CompanyWithTouchpoints } from "./types";
-import { QUADRANTS, quadrant, rankByPriority, RATE_TASK, type CockpitLine, type QuadrantKey } from "./urgency";
+import {
+  QUADRANTS,
+  quadrant,
+  rankByPriority,
+  type CockpitLine,
+  type QuadrantKey,
+  type UrgencyBreakdown,
+} from "./urgency";
 import { ESCALATED } from "./workingDays";
 
 export type Line = CockpitLine<CompanyWithTouchpoints>;
@@ -16,7 +23,7 @@ export type View = (typeof VIEWS)[number];
 
 export const TILES = {
   top: "My top 20",
-  new: "Unreviewed new startups",
+  new: "New this week, undecided",
   intros: "Warm intros due",
   drafts: "Drafts to approve",
   tracking: "Tracking > 3 months",
@@ -30,11 +37,8 @@ export function tileFilters<L extends CockpitLine>(lines: L[]): Record<TileKey, 
   const openPassing = lines.filter((line) => line.company.status === "open" && line.company.passed_hard_filters);
   return {
     top: rankByPriority(openPassing).slice(0, config.worklist_size),
-    new: rankByPriority(
-      openPassing.filter(
-        (line) => line.days_in_queue <= newDays && line.tasks.includes(RATE_TASK),
-      ),
-    ),
+    // First seen in the last few days and still open (neither advanced nor passed).
+    new: rankByPriority(openPassing.filter((line) => line.days_in_queue <= newDays)),
     intros: rankByPriority(lines.filter((line) => line.intro_state !== null)),
     drafts: rankByPriority(lines.filter((line) => line.tasks.includes("Approve pass draft"))),
     tracking: rankByPriority(openPassing.filter((line) => line.days_in_queue > trackingDays)),
@@ -88,6 +92,7 @@ export interface MatrixRow {
   Urgency: number;
   /** Why the urgency is what it is (tooltip). */
   urgency_reason: string;
+  urgency_breakdown: UrgencyBreakdown;
   x: number;
   y: number;
   Touchpoints: number;
@@ -110,6 +115,7 @@ export function matrixRows(lines: Line[]): MatrixRow[] {
       "Score %": line.score_percent,
       Urgency: line.urgency,
       urgency_reason: line.urgency_reason,
+      urgency_breakdown: line.urgency_breakdown,
       x: line.score_percent + spread(company.id, 37, 1.6),
       y: line.urgency + spread(company.id, 53, 2.4),
       Touchpoints: company.touchpoint_count,

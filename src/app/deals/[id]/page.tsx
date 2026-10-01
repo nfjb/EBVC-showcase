@@ -3,6 +3,7 @@
 /** Deal detail: one company — decide, see why it scores what it does, its history, pin its rank. */
 
 import { Ban, Bot, Hourglass } from "lucide-react";
+import Link from "next/link";
 import { redirect, useParams } from "next/navigation";
 
 import { DecideSection, RankOverrideForm } from "@/components/DealForms";
@@ -20,7 +21,7 @@ import { pageNameFor, safeReturnHref, withQuery } from "@/lib/routes";
 import { introducerThanksDialogData, introReplyDialogData, passDialogData } from "@/lib/crm/dialogData";
 import { daysInQueue, rankWorklist } from "@/lib/crm/triageActions";
 import { compareCodePoints, pyFixed } from "@/lib/triage/py";
-import { loadTriageConfig } from "@/lib/triage/config";
+import { demoToday, loadTriageConfig } from "@/lib/triage/config";
 import {
   CHANNEL_LABELS,
   DECISION_LABELS,
@@ -30,7 +31,15 @@ import {
   PASS_CODE_LABELS,
   rating,
 } from "@/lib/triage/labels";
-import { FATHOM_DIMENSIONS, queueFlag, ratedCount, ratingsOf, scoreBand, type BreakdownRow } from "@/lib/triage/scoring";
+import {
+  FATHOM_DIMENSIONS,
+  queueFlag,
+  ratedCount,
+  ratingsOf,
+  scoreBand,
+  type BreakdownRow,
+} from "@/lib/triage/scoring";
+import { buildLine, urgencySummary } from "@/lib/triage/urgency";
 
 import { EmptyCrm } from "../EmptyCrm";
 
@@ -51,8 +60,14 @@ export default function DealDetailPage() {
   if (!company) redirect(withQuery("/deals", { from }));
 
   const waiting = daysInQueue(company);
+  const urgencyInfo = buildLine(company, demoToday()).urgency_breakdown;
   const flag = queueFlag(waiting, loadTriageConfig().queue_flags);
-  const fallback = { title: "Team top 20", ids: rankWorklist(companies).slice(0, 20).map((item) => item.id) };
+  const fallback = {
+    title: "Team top 20",
+    ids: rankWorklist(companies)
+      .slice(0, 20)
+      .map((item) => item.id),
+  };
   const history = repo.touchpointsOf(company.id);
   const latestIntro = [...history].reverse().find((touchpoint) => touchpoint.channel === "warm_intro") ?? null;
   const breakdown = JSON.parse(company.score_breakdown || "[]") as BreakdownRow[];
@@ -89,12 +104,23 @@ export default function DealDetailPage() {
         <Metric label="Decision" value={label(DECISION_LABELS, company.status)} />
         <RankMetric />
         <Metric
-          label="Fathom score"
+          label="Importance Score"
           value={
             <span className="flex flex-col">
               {pyFixed(company.score, 1)} %
               <span className="text-xs font-normal text-muted-foreground">
                 {scoreBand(company.score, ratedCount(company), loadTriageConfig().fathom)}
+              </span>
+            </span>
+          }
+        />
+        <Metric
+          label="Urgency Score"
+          value={
+            <span className="flex flex-col">
+              {urgencyInfo.score}/100
+              <span className="text-xs font-normal text-muted-foreground">
+                {urgencyInfo.tier.label} · raw {urgencyInfo.raw}/{urgencyInfo.max_raw}
               </span>
             </span>
           }
@@ -135,42 +161,87 @@ export default function DealDetailPage() {
           }}
         />
 
-        <div>
-          {breakdown.length ? (
+        <div className="space-y-8">
+          <section aria-labelledby="importance-breakdown">
+            <h3 id="importance-breakdown" className="mb-2 text-base font-semibold">
+              Importance Score · {pyFixed(company.score, 1)} %
+            </h3>
+            {breakdown.length ? (
+              <DataTable>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fathom dimension</TableHead>
+                    <TableHead className={NUM}>Rating</TableHead>
+                    <TableHead className={NUM}>Weight</TableHead>
+                    <TableHead className={NUM}>Points (%)</TableHead>
+                    <TableHead>Note</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {breakdown.map((row) => (
+                    <TableRow key={row.component}>
+                      <TableCell>{DIMENSION_LABELS[row.component] ?? row.component}</TableCell>
+                      <TableCell className={NUM}>{rating(row.value)}</TableCell>
+                      <TableCell className={NUM}>{row.weight ? `${row.weight} %` : "bonus"}</TableCell>
+                      <TableCell className={NUM}>{pyFixed(row.points, 1)}</TableCell>
+                      <TableCell className="whitespace-normal">{row.note}</TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="font-semibold hover:bg-transparent">
+                    <TableCell>Importance Score</TableCell>
+                    <TableCell />
+                    <TableCell className={NUM}>100 %</TableCell>
+                    <TableCell className={NUM}>{pyFixed(company.score, 1)}</TableCell>
+                    <TableCell className="whitespace-normal">Capped at 100 %</TableCell>
+                  </TableRow>
+                </TableBody>
+              </DataTable>
+            ) : null}
+            <Caption>
+              Points = weight × rating / {loadTriageConfig().fathom.scale_max}. Ratings come from the Fathom agent or a
+              person, and a person&apos;s always win; unrated dimensions add nothing. Time in queue is not part of the
+              score.
+            </Caption>
+          </section>
+
+          <section aria-labelledby="urgency-breakdown">
+            <h3 id="urgency-breakdown" className="mb-2 text-base font-semibold">
+              Urgency Score · {urgencySummary(urgencyInfo)}
+            </h3>
             <DataTable>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Fathom dimension</TableHead>
-                  <TableHead className={NUM}>Rating</TableHead>
-                  <TableHead className={NUM}>Weight</TableHead>
-                  <TableHead className={NUM}>Points (%)</TableHead>
-                  <TableHead>Note</TableHead>
+                  <TableHead>Urgency dimension</TableHead>
+                  <TableHead>Why</TableHead>
+                  <TableHead className={NUM}>Points</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {breakdown.map((row) => (
-                  <TableRow key={row.component}>
-                    <TableCell>{DIMENSION_LABELS[row.component] ?? row.component}</TableCell>
-                    <TableCell className={NUM}>{rating(row.value)}</TableCell>
-                    <TableCell className={NUM}>{row.weight ? `${row.weight} %` : "bonus"}</TableCell>
-                    <TableCell className={NUM}>{pyFixed(row.points, 1)}</TableCell>
-                    <TableCell className="whitespace-normal">{row.note}</TableCell>
+                {urgencyInfo.rows.map((row) => (
+                  <TableRow key={row.dimension}>
+                    <TableCell>{row.label}</TableCell>
+                    <TableCell className="whitespace-normal text-muted-foreground">{row.note}</TableCell>
+                    <TableCell className={NUM}>
+                      {row.points} / {row.max}
+                    </TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="font-semibold hover:bg-transparent">
-                  <TableCell>Fathom score</TableCell>
-                  <TableCell />
-                  <TableCell className={NUM}>100 %</TableCell>
-                  <TableCell className={NUM}>{pyFixed(company.score, 1)}</TableCell>
-                  <TableCell className="whitespace-normal">Capped at 100 %</TableCell>
+                  <TableCell>Urgency Score</TableCell>
+                  <TableCell className="whitespace-normal">
+                    round({urgencyInfo.raw} / {urgencyInfo.max_raw} × 100) · {urgencyInfo.tier.label}
+                  </TableCell>
+                  <TableCell className={NUM}>{urgencyInfo.score}</TableCell>
                 </TableRow>
               </TableBody>
             </DataTable>
-          ) : null}
-          <Caption>
-            Points = weight × rating / {loadTriageConfig().fathom.scale_max}. Every rating is a person&apos;s; unrated dimensions
-            add nothing. Time in queue is not part of the score.
-          </Caption>
+            <Caption>
+              {urgencyInfo.tier.action} Time in queue never counts: it only raises the 14- and 21-day flags.{" "}
+              <Link className="underline" href="/scoring#urgency">
+                How the Urgency Score works
+              </Link>
+            </Caption>
+          </section>
         </div>
 
         <DataTable>

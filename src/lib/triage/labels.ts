@@ -19,6 +19,20 @@ export const INTRO_LABELS: Record<string, string> = {
   replied: "✅ Replied",
   closed: "▪ Closed",
 };
+/** Audit-log decision codes, as people read them. */
+export const DECISION_KIND_LABELS: Record<string, string> = {
+  advance: "Advanced",
+  pass: "Passed",
+  rating_changed: "Ratings changed",
+  rank_override: "Rank pinned",
+  merge_approved: "Duplicate merged",
+  merge_rejected: "Kept as separate companies",
+  message_sent: "Message sent (simulated)",
+  intro_replied: "Intro marked replied",
+  intro_closed: "Intro closed without reply",
+  intro_open: "Intro reopened",
+};
+
 export const CHANNEL_LABELS: Record<string, string> = {
   website_form: "Website form",
   cold_email: "Cold email",

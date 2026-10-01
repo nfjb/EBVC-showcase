@@ -53,6 +53,7 @@ export const TABLE_COLUMNS: Record<TableName, string[]> = {
     "score_breakdown",
     "latest_signal",
     "latest_signal_at",
+    "latest_signal_type",
     "rank_override",
     "rank_override_comment",
   ],

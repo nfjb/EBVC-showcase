@@ -103,6 +103,7 @@ export function buildCompanyFields(
     score_breakdown: JSON.stringify(breakdown),
     latest_signal: latestSignal ? describeSignal(latestSignal) : "",
     latest_signal_at: latestSignal ? parseIsoDate(latestSignal.event_date) : null,
+    latest_signal_type: latestSignal ? latestSignal.signal_type : "",
     rank_override: null,
     rank_override_comment: "",
   };

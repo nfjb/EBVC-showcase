@@ -46,6 +46,7 @@ const blank: CompanyFields = {
   score_breakdown: "[]",
   latest_signal: "",
   latest_signal_at: null,
+  latest_signal_type: "",
   rank_override: null,
   rank_override_comment: "",
 };

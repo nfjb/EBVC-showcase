@@ -1,13 +1,22 @@
 /**
- * Urgency and cockpit priority (user decision 2026-09-30: score % × urgency, and urgency
- * never comes from time in queue).
+ * Urgency and cockpit priority (user decision 2026-09-30: Importance × Urgency, and urgency
+ * never comes from time in queue). The Urgency Score follows the LP scoring matrix: five
+ * dimensions, a raw sum out of 120, normalised to 0–100.
  */
 
 import { describe, expect, it } from "vitest";
 
 import { loadTriageConfig } from "@/lib/triage/config";
 import { pyRound } from "@/lib/triage/py";
-import { buildLine, quadrant, rankByPriority, urgency, urgencyReason, type LineCompany } from "@/lib/triage/urgency";
+import {
+  buildLine,
+  quadrant,
+  rankByPriority,
+  urgency,
+  urgencyBreakdown,
+  urgencySummary,
+  type LineCompany,
+} from "@/lib/triage/urgency";
 
 const TODAY = "2026-09-30"; // Wednesday
 const RULES = loadTriageConfig().urgency;
@@ -51,43 +60,110 @@ describe("urgency and priority", () => {
     expect(fresh.flag).toBeFalsy();
   });
 
-  it("makes an overdue intro more urgent than one still in time", () => {
-    const overdue = { past_deadline: true, escalation: "Escalated to responsible partner" } as const;
-    const inTime = { past_deadline: false, escalation: "On track" } as const;
-    expect(urgency(null, { ...overdue, deadline: "2026-09-29", working_days_elapsed: 4 }, TODAY)).toBe(
-      RULES.intro_overdue,
-    );
-    expect(urgency(null, { ...inTime, deadline: "2026-10-02", working_days_elapsed: 0 }, TODAY)).toBe(
-      RULES.intro_open,
-    );
-    expect(RULES.intro_overdue).toBeGreaterThan(RULES.intro_open);
+  const OVERDUE = {
+    past_deadline: true,
+    escalation: "Escalated to responsible partner",
+    deadline: "2026-09-25",
+    working_days_elapsed: 4,
+  } as const;
+  const DUE_TODAY = {
+    past_deadline: false,
+    escalation: "Escalated to responsible partner",
+    deadline: "2026-09-30",
+    working_days_elapsed: 3,
+  } as const;
+  const REMINDER = {
+    past_deadline: false,
+    escalation: "Reminder to owner",
+    deadline: "2026-10-01",
+    working_days_elapsed: 2,
+  } as const;
+  const IN_TIME = {
+    past_deadline: false,
+    escalation: "On track",
+    deadline: "2026-10-02",
+    working_days_elapsed: 0,
+  } as const;
+  const touch = (channel: string, received_at: string, introducer_type = "none") => ({
+    channel,
+    received_at,
+    introducer_type,
   });
 
-  it("raises urgency for a recent signal, less for an older one", () => {
-    expect(urgency("2026-09-25", null, TODAY)).toBe(RULES.base + RULES.recent_signal_bonus);
-    expect(urgency("2026-08-25", null, TODAY)).toBe(RULES.base + RULES.signal_bonus);
-    expect(urgency(null, null, TODAY)).toBe(RULES.base);
+  it("adds five dimensions to a raw score out of 120 and normalises it to 0–100", () => {
+    const breakdown = urgencyBreakdown(
+      {
+        latest_signal_at: "2026-09-20",
+        latest_signal_type: "traction_update",
+        touchpoints: [touch("warm_intro", "2026-09-29", "LP")],
+      },
+      OVERDUE,
+      TODAY,
+      "LP",
+    );
+    expect(breakdown.rows.map((row) => [row.dimension, row.points, row.max])).toEqual([
+      ["reply_obligation", 40, 40],
+      ["relationship", 20, 20],
+      ["activity", 25, 25],
+      ["competitive_pressure", 14, 20],
+      ["momentum", 15, 15],
+    ]);
+    expect(breakdown.raw).toBe(114);
+    expect(breakdown.max_raw).toBe(120);
+    expect(breakdown.score).toBe(Math.round((114 / 120) * 100));
+    expect(urgencySummary(breakdown)).toBe("95/100 (raw 114/120) · Act today");
+    expect(breakdown.rows[0].note).toBe("LP intro reply overdue since Fri 25 Sep");
   });
 
-  it("explains each urgency with the same number it computes", () => {
-    const states = [
+  it("never scores zero: a quiet cold deal still lands in the lowest tier", () => {
+    const quiet = urgencyBreakdown(
+      { latest_signal_at: null, touchpoints: [touch("cold_email", "2026-06-01")] },
       null,
-      { past_deadline: true, escalation: "Escalated to responsible partner", deadline: "2026-09-25", working_days_elapsed: 4 },
-      { past_deadline: false, escalation: "Escalated to responsible partner", deadline: "2026-09-30", working_days_elapsed: 3 },
-      { past_deadline: false, escalation: "Reminder to owner", deadline: "2026-10-01", working_days_elapsed: 2 },
-      { past_deadline: false, escalation: "On track", deadline: "2026-10-02", working_days_elapsed: 0 },
-    ] as const;
-    for (const signal of [null, "2026-09-25", "2026-08-25", "2026-06-01"]) {
-      for (const state of states) {
-        const value = urgency(signal, state, TODAY);
-        expect(urgencyReason(signal, state, TODAY, "LP")).toContain(String(value));
-      }
-    }
-    expect(urgencyReason(null, states[1], TODAY, "LP")).toBe("LP intro reply overdue since Fri 25 Sep → 95.");
-    expect(urgencyReason("2026-08-25", null, TODAY)).toBe(
-      "Base 30 + 15 for a signal in the last 45 days (Tue 25 Aug, 36 days ago) = 45.",
+      TODAY,
     );
-    expect(urgencyReason(null, null, TODAY)).toBe("Base 30: no open warm intro and no recent signal.");
+    expect(quiet.raw).toBe(RULES.relationship.cold);
+    expect(quiet.score).toBeGreaterThan(0);
+    expect(quiet.tier.label).toBe("No rush");
+  });
+
+  it("ranks the warm-intro deadline stages: overdue > due today > reminder > open > none", () => {
+    const deal = { latest_signal_at: null, touchpoints: [touch("warm_intro", "2026-06-01", "angel")] };
+    const scores = [OVERDUE, DUE_TODAY, REMINDER, IN_TIME, null].map((state) => urgency(deal, state, TODAY));
+    expect([...scores].sort((x, y) => y - x)).toEqual(scores);
+    expect(new Set(scores).size).toBe(scores.length);
+  });
+
+  it("rates the relationship: warm intro > several channels > a single cold inbound", () => {
+    const points = (touchpoints: ReturnType<typeof touch>[]) =>
+      urgencyBreakdown({ latest_signal_at: null, touchpoints }, null, TODAY).rows.find(
+        (row) => row.dimension === "relationship",
+      )!.points;
+    expect(points([touch("warm_intro", "2026-06-01", "LP")])).toBe(RULES.relationship.warm_intro);
+    expect(points([touch("cold_email", "2026-06-01"), touch("linkedin", "2026-06-02")])).toBe(
+      RULES.relationship.repeat_contact,
+    );
+    expect(points([touch("cold_email", "2026-06-01")])).toBe(RULES.relationship.cold);
+  });
+
+  it("counts competitive pressure only for a recent signal, an announced round highest", () => {
+    const pressure = (latest_signal_at: string, latest_signal_type: string) =>
+      urgencyBreakdown({ latest_signal_at, latest_signal_type, touchpoints: [] }, null, TODAY).rows.find(
+        (row) => row.dimension === "competitive_pressure",
+      )!.points;
+    expect(pressure("2026-09-01", "round_announced")).toBe(RULES.competitive_pressure.round_announced);
+    expect(pressure("2026-09-01", "round_announced")).toBeGreaterThan(pressure("2026-09-01", "news"));
+    expect(pressure("2026-05-01", "round_announced")).toBe(0);
+  });
+
+  it("measures founder momentum by the latest inbound, not the first one", () => {
+    const momentum = (dates: string[]) =>
+      urgencyBreakdown(
+        { latest_signal_at: null, touchpoints: dates.map((day) => touch("cold_email", day)) },
+        null,
+        TODAY,
+      ).rows.find((row) => row.dimension === "momentum")!.points;
+    expect(momentum(["2026-03-01", "2026-09-28"])).toBe(RULES.momentum[0].points);
+    expect(momentum(["2026-03-01"])).toBe(0);
   });
 
   it("is score % × urgency", () => {

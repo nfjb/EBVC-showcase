@@ -69,7 +69,7 @@ export function Notice({
 
 /** A row of stat cards. */
 export function Metrics({ children }: { children: ReactNode }) {
-  return <div className="my-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">{children}</div>;
+  return <div className="my-4 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">{children}</div>;
 }
 
 export function Metric({ label, value }: { label: string; value: ReactNode }) {

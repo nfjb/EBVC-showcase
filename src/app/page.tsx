@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { ExportControls, NavigateSelect, NextActionPill, type PillAction } from "@/components/CockpitClient";
 import { RememberDealList } from "@/components/dealList";
 import { HeaderActions } from "@/components/HeaderActions";
+import { ScoreHint } from "@/components/ScoreHint";
 import {
   ariaSort,
   ImportanceHeader,
@@ -37,7 +38,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useActingMember, useCrm, useSearchRecord } from "@/components/useCrm";
 import * as repo from "@/lib/db/repository";
@@ -337,7 +337,6 @@ function PriorityTable({
         <TableRow className="hover:bg-transparent">
           <TableHead className={RANK}>#</TableHead>
           <TableHead>Company</TableHead>
-          <TableHead>Description</TableHead>
           <TableHead className={NUM} aria-sort={ariaSort(sort, "importance")}>
             <ImportanceHeader sort={sort} sortHref={sortHref("importance")} />
           </TableHead>
@@ -347,83 +346,93 @@ function PriorityTable({
           <TableHead className={NUM} aria-sort={ariaSort(sort, "total")}>
             <TotalHeader sort={sort} sortHref={sortHref("total")} />
           </TableHead>
-          <TableHead>Open tasks</TableHead>
-          <TableHead>{actionable ? "Next action" : "Assigned to · next step"}</TableHead>
+          <TableHead className="text-center">Tasks</TableHead>
+          <TableHead className={actionable ? "text-right" : undefined}>
+            {actionable ? "Next action" : "Assigned to · next step"}
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {lines.map((line, index) => {
           const company = line.company;
-          const detail =
-            `${company.stage} · ${company.country}` +
-            (!company.passed_hard_filters ? ` · failed: ${label(PASS_CODE_LABELS, company.pass_code)}` : "");
           const tasksText = line.tasks.join(", ") || "No open tasks";
           return (
             <TableRow key={company.id}>
               <TableCell className={RANK}>
                 {rankOf.get(company.id) ?? index + 1}
                 {company.rank_override ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span tabIndex={0} className="ml-1 inline-flex">
-                        <Pin
-                          className="size-3.5 text-primary"
-                          aria-label={`Pinned: ${company.rank_override_comment}`}
-                        />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>Pinned: {company.rank_override_comment}</TooltipContent>
-                  </Tooltip>
+                  <ScoreHint
+                    label={`Pinned: ${company.rank_override_comment}`}
+                    className="ml-1 inline-flex no-underline"
+                    side="right"
+                    trigger={<Pin className="size-3.5 text-primary" aria-hidden="true" />}
+                  >
+                    Pinned: {company.rank_override_comment}
+                  </ScoreHint>
                 ) : null}
               </TableCell>
-              <TableCell>
-                <Link
-                  className="text-base font-bold text-foreground no-underline hover:text-primary hover:underline"
-                  href={dealHref(company.id, currentHref)}
-                  title="Open the deal"
-                >
-                  {company.name}
-                </Link>
-              </TableCell>
-              <TableCell className="min-w-64 whitespace-normal">
-                <div className="leading-snug text-foreground/90">
-                  {company.one_liner}
-                  <small className="mt-0.5 block text-[13px] leading-tight text-muted-foreground">
-                    {detail}
-                    {line.flag && company.passed_hard_filters ? (
-                      <>
-                        {" · "}
-                        <Hourglass className="inline size-3" aria-hidden="true" /> {line.flag}
-                      </>
+              <TableCell className="w-full py-3 whitespace-normal">
+                <div className="max-w-md min-w-56">
+                  <Link
+                    className="font-semibold text-foreground no-underline hover:text-primary hover:underline"
+                    href={dealHref(company.id, currentHref)}
+                  >
+                    {company.name}
+                  </Link>
+                  <p className="truncate text-sm text-muted-foreground" title={company.one_liner}>
+                    {company.one_liner}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    <Badge variant="outline" className={CHIP}>
+                      {company.stage}
+                    </Badge>
+                    <Badge variant="outline" className={CHIP}>
+                      {company.country}
+                    </Badge>
+                    {!company.passed_hard_filters ? (
+                      <Badge variant="outline" className={cn(CHIP, "border-error-foreground/30 text-error-foreground")}>
+                        Failed: {label(PASS_CODE_LABELS, company.pass_code)}
+                      </Badge>
                     ) : null}
-                  </small>
+                    {line.flag && company.passed_hard_filters ? (
+                      <Badge className={cn(CHIP, "border-transparent bg-warning text-warning-foreground")}>
+                        <Hourglass aria-hidden="true" /> {line.flag}
+                      </Badge>
+                    ) : null}
+                  </div>
                 </div>
               </TableCell>
               <TableCell className={cn(NUM, "text-base")}>
                 <ImportanceValue company={company} />
               </TableCell>
               <TableCell className={cn(NUM, "text-base")}>
-                <UrgencyValue value={line.urgency} reason={line.urgency_reason} hot={line.urgency >= 80} />
+                <UrgencyValue breakdown={line.urgency_breakdown} hot={line.urgency >= 80} />
               </TableCell>
               <TableCell className={cn(NUM, "text-base")}>
                 <TotalValue importance={line.score_percent} urgency={line.urgency} total={line.priority} />
               </TableCell>
               <TableCell className="text-center">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge
-                      tabIndex={0}
-                      variant={line.urgent ? "default" : "secondary"}
-                      className="h-6 min-w-7 font-semibold"
-                      aria-label={`${line.tasks.length} open tasks: ${tasksText}`}
-                    >
+                <ScoreHint
+                  label={`${line.tasks.length} open tasks: ${tasksText}`}
+                  className="no-underline"
+                  trigger={
+                    <Badge variant={line.urgent ? "default" : "secondary"} className="h-6 min-w-7 font-semibold">
                       {line.tasks.length}
                     </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent>{tasksText}</TooltipContent>
-                </Tooltip>
+                  }
+                >
+                  {line.tasks.length ? (
+                    <ul className="list-disc space-y-0.5 pl-4">
+                      {line.tasks.map((task) => (
+                        <li key={task}>{task}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    "No open tasks"
+                  )}
+                </ScoreHint>
               </TableCell>
-              <TableCell>
+              <TableCell className={actionable ? "text-right" : "w-60 min-w-52 whitespace-normal"}>
                 {actionable ? (
                   <NextActionPill
                     label={`${line.intro_state?.past_deadline ? "⚠ " : ""}${line.next_action} →`}
@@ -443,6 +452,8 @@ function PriorityTable({
 }
 
 const RANK = "w-10 text-right text-muted-foreground tabular-nums";
+/** The small stage / country / flag chips under a company name. */
+const CHIP = "h-5 px-1.5 text-[11px] font-normal";
 
 /** The cockpit's tables: bordered, on a card. */
 function CockpitTable({ children }: { children: ReactNode }) {
@@ -520,7 +531,7 @@ function CountTable({
 }
 
 function HotTopics({ lines, today, currentHref }: { lines: Line[]; today: IsoDate; currentHref: string }) {
-  const windowDays = loadTriageConfig().urgency.signal_days;
+  const windowDays = loadTriageConfig().cockpit.hot_topic_days;
   const recent = lines
     .filter(
       (line) =>

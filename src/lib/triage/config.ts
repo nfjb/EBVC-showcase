@@ -18,19 +18,22 @@ export interface TriageConfig {
   intro_reply_working_days: number;
   suggested_merge_similarity: number;
   worklist_size: number;
-  urgency: {
-    base: number;
-    intro_overdue: number;
-    intro_due_today: number;
-    intro_reminder: number;
-    intro_open: number;
-    recent_signal_days: number;
-    recent_signal_bonus: number;
-    signal_days: number;
-    signal_bonus: number;
-  };
-  cockpit: { new_startup_days: number; long_tracking_days: number };
+  urgency: UrgencyRules;
+  cockpit: { new_startup_days: number; long_tracking_days: number; hot_topic_days: number };
   matrix: { score_split: number; urgency_split: number };
+}
+
+/** The Urgency Score's five dimensions, point tables and tiers (config/weights.yaml → urgency). */
+export interface UrgencyRules {
+  reply_obligation: { overdue: number; due_today: number; reminder: number; open: number; none: number };
+  relationship: { warm_intro: number; repeat_contact: number; cold: number };
+  /** Points by age of the latest signal, most recent band first. */
+  activity: { days: number; points: number }[];
+  competitive_pressure_days: number;
+  competitive_pressure: Record<string, number>;
+  /** Points by days since the founder's latest inbound, most recent band first. */
+  momentum: { days: number; points: number }[];
+  tiers: { min: number; label: string; action: string }[];
 }
 
 /** The Fathom investment criteria: weights in %, bands highest first. */
