@@ -34,7 +34,7 @@ const SECTIONS = [
   { id: "who-rates", title: "Who rates" },
   { id: "example", title: "Worked example" },
   { id: "urgency", title: "Urgency Score" },
-  { id: "priority", title: "Priority and the matrix" },
+  { id: "priority", title: "Attention Score and the matrix" },
 ];
 
 function Section({
@@ -418,17 +418,17 @@ export default function ScoringPage() {
       {/* ── Priority ─────────────────────────────────────────────────────────── */}
       <Section
         id="priority"
-        title="Priority and the matrix"
+        title="Attention Score and the matrix"
         description="The two scores combine into the order of the cockpit and the four quadrants of the priority matrix."
       >
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Priority</CardTitle>
-              <CardDescription>The order of every worklist in the cockpit.</CardDescription>
+              <CardTitle>Attention Score</CardTitle>
+              <CardDescription>Which deal needs the team&apos;s attention first: the order of every worklist.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              <Formula>Priority = Quality Score × Urgency Score / 100</Formula>
+              <Formula>Attention Score = Quality Score × Urgency Score / 100</Formula>
               <p>
                 Ties go to the higher Quality Score, then the higher Urgency Score, then the name. A rank a person
                 pins on the deal page keeps its place, with the reason logged.

@@ -166,7 +166,7 @@ is in `src/lib/triage/urgency.ts`; every number is in `config/weights.yaml` → 
 `Urgency Score = round(raw / 120 × 100)`. Tiers: 80+ act today, 60–79 this week, 40–59 soon,
 20–39 monitor, below 20 no rush. No score is ever 0: a single cold inbound scores 4 raw.
 
-**Priority** (the Total Score column) = Quality Score × Urgency Score / 100. The cockpit
+**Attention Score** (the priority) = Quality Score × Urgency Score / 100. The cockpit
 ranks by priority, then Quality Score, then Urgency Score, then name; a rank pinned by a
 person keeps its place. The priority matrix splits Urgency Score at 40, where the "Soon" tier
 starts: open warm intros land above it.

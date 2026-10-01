@@ -144,8 +144,8 @@ function ScoreHeader({
   infoHref: string;
   info: ReactNode;
 }) {
-  // No explicit sort is the priority order, which is the Total Score, descending.
-  const active = (sort.column ?? "total") === column;
+  // No explicit sort is the priority order, which is the Attention Score, descending.
+  const active = (sort.column ?? "attention") === column;
   const Arrow = !active ? ArrowUpDown : sort.direction === "asc" ? ArrowUp : ArrowDown;
   return (
     <span className="inline-flex items-center gap-0.5">
@@ -209,27 +209,35 @@ export function UrgencyHeader({ sort, sortHref }: { sort: SortState; sortHref: s
   );
 }
 
-export function TotalHeader({ sort, sortHref }: { sort: SortState; sortHref: string }) {
+export function AttentionHeader({ sort, sortHref }: { sort: SortState; sortHref: string }) {
   return (
     <ScoreHeader
-      label="Total Score"
-      column="total"
+      label="Attention Score"
+      column="attention"
       sort={sort}
       sortHref={sortHref}
       infoHref="/scoring#priority"
-      info="Quality Score × Urgency Score / 100: the priority every worklist is ordered by. A deal that is both strong and pressing scores highest."
+      info="Quality Score × Urgency Score / 100: which deal needs attention first; every worklist is ordered by it. A deal that is both strong and pressing scores highest."
     />
   );
 }
 
-/** The Total Score (priority) with its calculation on hover. */
-export function TotalValue({ quality, urgency, total }: { quality: number; urgency: number; total: number }) {
-  const text = `${quality} % × ${urgency} / 100 = ${pyFixed(total, 1)}`;
+/** The Attention Score (the priority) with its calculation on hover. */
+export function AttentionValue({
+  quality,
+  urgency,
+  attention,
+}: {
+  quality: number;
+  urgency: number;
+  attention: number;
+}) {
+  const text = `${quality} % × ${urgency} / 100 = ${pyFixed(attention, 1)}`;
   return (
     <ScoreHint
-      label={`Total Score ${pyFixed(total, 1)}: ${text}`}
+      label={`Attention Score ${pyFixed(attention, 1)}: ${text}`}
       className="cursor-help font-semibold underline decoration-muted-foreground/40 decoration-dotted underline-offset-4"
-      trigger={pyFixed(total, 1)}
+      trigger={pyFixed(attention, 1)}
     >
       Quality Score × Urgency Score / 100
       <br />

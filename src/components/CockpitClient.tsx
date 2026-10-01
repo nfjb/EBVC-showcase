@@ -91,7 +91,7 @@ export interface ExportRow {
   Country: string;
   "Quality Score": number;
   "Urgency Score": number;
-  "Total Score": number;
+  "Attention Score": number;
   "Open tasks": string;
   "Next action": string;
   "Days in queue": number;
@@ -107,7 +107,7 @@ const EXPORT_COLUMNS: (keyof ExportRow)[] = [
   "Country",
   "Quality Score",
   "Urgency Score",
-  "Total Score",
+  "Attention Score",
   "Open tasks",
   "Next action",
   "Days in queue",

@@ -20,8 +20,8 @@ import {
   nextSort,
   readSort,
   sortByScore,
-  TotalHeader,
-  TotalValue,
+  AttentionHeader,
+  AttentionValue,
   UrgencyHeader,
   UrgencyValue,
   type SortColumn,
@@ -117,13 +117,13 @@ function MatrixBody({
   const shown = sortByScore(
     byPriorityThenScore(selected ? rows.filter((row) => row.quadrant_key === selected) : rows),
     sort,
-    (row) => ({ quality: row["Score %"], urgency: row.Urgency, total: row.Priority }),
+    (row) => ({ quality: row["Score %"], urgency: row.Urgency, attention: row.Priority }),
   );
   const sortHref = (column: SortColumn) =>
     withQuery("/matrix", { owner: ownerParam, q: selected, ...nextSort(sort, column) });
   const orderNote = !sort.column
     ? "highest priority first"
-    : `by ${{ quality: "Quality Score", urgency: "Urgency Score", total: "Total Score" }[sort.column]}, ${
+    : `by ${{ quality: "Quality Score", urgency: "Urgency Score", attention: "Attention Score" }[sort.column]}, ${
         sort.direction === "asc" ? "lowest" : "highest"
       } first`;
   const title = selected ? QUADRANTS[selected][0] : "All deals on the matrix";
@@ -195,8 +195,8 @@ function MatrixBody({
             <TableHead className={NUM} aria-sort={ariaSort(sort, "urgency")}>
               <UrgencyHeader sort={sort} sortHref={sortHref("urgency")} />
             </TableHead>
-            <TableHead className={NUM} aria-sort={ariaSort(sort, "total")}>
-              <TotalHeader sort={sort} sortHref={sortHref("total")} />
+            <TableHead className={NUM} aria-sort={ariaSort(sort, "attention")}>
+              <AttentionHeader sort={sort} sortHref={sortHref("attention")} />
             </TableHead>
             <TableHead className={NUM}>Touch­points</TableHead>
             <TableHead>Source</TableHead>
@@ -221,7 +221,7 @@ function MatrixBody({
                 <UrgencyValue breakdown={row.urgency_breakdown} />
               </TableCell>
               <TableCell className={NUM}>
-                <TotalValue quality={row["Score %"]} urgency={row.Urgency} total={row.Priority} />
+                <AttentionValue quality={row["Score %"]} urgency={row.Urgency} attention={row.Priority} />
               </TableCell>
               <TableCell className={NUM}>{row.Touchpoints}</TableCell>
               <TableCell>{row.Source}</TableCell>

@@ -25,8 +25,8 @@ import {
   nextSort,
   readSort,
   sortByScore,
-  TotalHeader,
-  TotalValue,
+  AttentionHeader,
+  AttentionValue,
   UrgencyHeader,
   UrgencyValue,
   type SortColumn,
@@ -181,7 +181,7 @@ function WorkList({
   const selected = sortByScore(ranked, sort, (line) => ({
     quality: line.company.score,
     urgency: line.urgency,
-    total: line.priority,
+    attention: line.priority,
   }));
   // My view: act directly. Team view: see who owns each step, so it can be chased.
   const actionable = view === "My view";
@@ -273,7 +273,7 @@ function WorkList({
           Country: line.company.country,
           "Quality Score": line.score_percent,
           "Urgency Score": line.urgency,
-          "Total Score": line.priority,
+          "Attention Score": line.priority,
           "Open tasks": line.tasks.join("; "),
           "Next action": line.next_action,
           "Days in queue": line.days_in_queue,
@@ -343,8 +343,8 @@ function PriorityTable({
           <TableHead className={NUM} aria-sort={ariaSort(sort, "urgency")}>
             <UrgencyHeader sort={sort} sortHref={sortHref("urgency")} />
           </TableHead>
-          <TableHead className={NUM} aria-sort={ariaSort(sort, "total")}>
-            <TotalHeader sort={sort} sortHref={sortHref("total")} />
+          <TableHead className={NUM} aria-sort={ariaSort(sort, "attention")}>
+            <AttentionHeader sort={sort} sortHref={sortHref("attention")} />
           </TableHead>
           <TableHead className="text-center">Tasks</TableHead>
           <TableHead className={actionable ? "text-right" : undefined}>
@@ -409,7 +409,7 @@ function PriorityTable({
                 <UrgencyValue breakdown={line.urgency_breakdown} hot={line.urgency >= 80} />
               </TableCell>
               <TableCell className={cn(NUM, "text-base")}>
-                <TotalValue quality={line.score_percent} urgency={line.urgency} total={line.priority} />
+                <AttentionValue quality={line.score_percent} urgency={line.urgency} attention={line.priority} />
               </TableCell>
               <TableCell className="text-center">
                 <ScoreHint
