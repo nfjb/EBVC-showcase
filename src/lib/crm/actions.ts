@@ -25,6 +25,7 @@ import {
   setIntroStatus,
 } from "@/lib/crm/triageActions";
 import type { ReplyDraft } from "@/lib/triage/drafts";
+import type { O1Ratings } from "@/lib/triage/scoring";
 import { ActionRefused } from "@/lib/triage/errors";
 
 export type ActionResult = { ok: true; message: string } | { ok: false; error: string };
@@ -56,13 +57,8 @@ export function setActingPersonAction(name: string): void {
   setActingMember(name);
 }
 
-export async function saveRatingsAction(
-  companyId: number,
-  thesisFit: number,
-  market: number | null,
-  team: number | null,
-): Promise<ActionResult> {
-  return run((person) => saveRatings(companyId, thesisFit, market, team, person), "Ratings saved; score updated.");
+export async function saveRatingsAction(companyId: number, ratings: O1Ratings): Promise<ActionResult> {
+  return run((person) => saveRatings(companyId, ratings, person), "O1 ratings saved; score updated.");
 }
 
 export async function advanceAction(companyId: number, comment: string): Promise<ActionResult> {

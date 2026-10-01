@@ -41,7 +41,7 @@ npm run build && npm start
 | --- | --- |
 | **Cockpit** | My view / Team view / Pipeline / Hot topics. KPI tiles double as quick filters; the table is ranked by score % × urgency; CSV export and a print view for the Monday meeting |
 | **Priority matrix** | Every open, filter-passing deal on score % × urgency, in four quadrants. Click a bubble to open the deal |
-| **Deal detail** | Ratings (thesis fit, market, team), advance / pass with a drafted reply, warm-intro reply and thank-you, score breakdown, touchpoint history, rank override |
+| **Deal detail** | O1 ratings (ten dimensions, 1–5, plus a storytelling bonus) with a live score preview, advance / pass with a drafted reply, warm-intro reply and thank-you, score breakdown, touchpoint history, rank override |
 | **Intro tracker** | Warm intros against the three-working-day SLA: day-2 reminder, day-3 escalation to the responsible partner |
 | **Merge queue** | Fuzzy name matches waiting for a person: same company (merge) or different |
 | **Outbox** | Every reply "sent" from the app (simulated: nothing leaves the app) |
@@ -55,16 +55,16 @@ Every decision is logged under "<name> (demo)".
 
 All the rules live in `config/` and are bundled into the app (restart `npm run dev` after editing):
 
-- `config/weights.yaml`: score weights, hard filters, queue flags, SLA, urgency, cockpit and
-  matrix settings, and the demo's fixed "today" (2026-09-30).
-- `config/thesis.md`: the thesis and the keywords behind the suggested thesis fit.
+- `config/weights.yaml`: the O1 score weights and interpretation bands, hard filters, queue
+  flags, SLA, urgency, cockpit and matrix settings, and the demo's fixed "today" (2026-09-30).
+- `config/thesis.md`: the written fund thesis, for reference. It no longer feeds the score.
 - `config/team.yaml`: the team, their roles and who each escalates to.
 
 
 ## Layout
 
 ```
-config/               the triage rules (weights, thesis, team)
+config/               the triage rules (O1 weights, team; thesis for reference)
 demo/                 the demo CSVs and their generator (_generate.py)
 src/lib/triage/       the rules, pure: normalise, dedup, filters, scoring, urgency, drafts…
 src/lib/db/           the in-memory store and its queries
@@ -89,6 +89,31 @@ touchpoints, scores and breakdowns, suggested merges, every cockpit line (urgenc
 priority, tasks, next action), rankings, tile filters for every owner, matrix positions,
 all 2,602 reply drafts, intro states, plus 8,007 Jaro-Winkler pairs, 12,030 rounding cases
 and 1,200 working-day cases.
+
+The one deliberate exception is the score. It no longer follows the Python app's thesis fit,
+market, team, momentum and source quality. It now follows the **O1 Venture investment
+criteria** (Pre-Seed / Seed, March 2026), described in the next section.
+
+### Scoring: the O1 investment criteria
+
+A person rates ten dimensions from 1 (weak) to 5 (strong) on Deal detail; the weights are the
+framework's:
+
+| Dimension | Weight | Dimension | Weight |
+| --- | --- | --- | --- |
+| Team | 20 % | Traction & validation | 10 % |
+| Market opportunity | 15 % | Competition & differentiation | 5 % |
+| Problem–solution fit | 15 % | Go-to-market | 5 % |
+| Technology & product | 10 % | Financial plan & use of funds | 5 % |
+| Business model | 10 % | Exit potential | 5 % |
+
+Score % = sum(weight × rating / 5). Storytelling & design adds 0–5 bonus points, the total
+capped at 100 %. Once all ten are rated, the score reads as a band: 90+ investable – strong,
+75+ investable with minor gaps, 60+ watchlist, 40+ not investable, below 40 no fit.
+
+Nothing is rated automatically, so every company starts at 0 %. The cockpit then orders
+unrated deals by urgency, and shows "–" in the O1 % column until someone rates them. The
+matrix's score line sits at 60 % (the watchlist line).
 
 ### What changed with the move off Lex
 

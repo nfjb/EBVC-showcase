@@ -13,7 +13,14 @@ import { daysBetween } from "@/lib/triage/dates";
 import { PASS_CODES } from "@/lib/triage/drafts";
 import { ActionRefused } from "@/lib/triage/errors";
 import { pyFixed, pyStrip } from "@/lib/triage/py";
-import { scoreCompany, sourceQualityFromChannels } from "@/lib/triage/scoring";
+import {
+  O1_DIMENSIONS,
+  O1_KEYS,
+  ratingsOf,
+  scoreCompany,
+  STORYTELLING,
+  type O1Ratings,
+} from "@/lib/triage/scoring";
 import type { Company, CompanyWithTouchpoints, MergeSuggestion } from "@/lib/triage/types";
 import { buildLine, rankByPriority } from "@/lib/triage/urgency";
 
@@ -49,57 +56,38 @@ export function logDecision(
   });
 }
 
-/** Recompute score and breakdown from the stored components (never from queue time). */
-export function rescore(company: Company): Pick<Company, "score" | "score_breakdown"> {
-  const [score, breakdown] = scoreCompany(
-    {
-      thesis_fit: company.thesis_fit,
-      market: company.market,
-      team: company.team,
-      momentum: company.momentum,
-      source_quality: company.source_quality,
-    },
-    loadTriageConfig().weights,
-    company.thesis_fit_confirmed,
-  );
+/** Recompute score and breakdown from the stored O1 ratings (never from queue time). */
+export function rescore(company: object): Pick<Company, "score" | "score_breakdown"> {
+  const [score, breakdown] = scoreCompany(ratingsOf(company), loadTriageConfig().o1);
   return { score, score_breakdown: JSON.stringify(breakdown) };
 }
 
-function checkRating(value: number | null, label: string): void {
-  if (value !== null && ![1, 2, 3].includes(value)) throw new ActionRefused(`${label} must be 1, 2 or 3.`);
+function checkRating(value: number | null, label: string, low: number, high: number): void {
+  if (value !== null && !(Number.isInteger(value) && value >= low && value <= high)) {
+    throw new ActionRefused(`${label} must be a whole number from ${low} to ${high}.`);
+  }
 }
 
-/** A person confirms thesis fit and rates market and team (team is only ever set here). */
-export function saveRatings(
-  companyId: number,
-  thesisFit: number,
-  market: number | null,
-  team: number | null,
-  decidedBy: string,
-): void {
-  for (const [value, label] of [
-    [thesisFit, "Thesis fit"],
-    [market, "Market"],
-    [team, "Team"],
-  ] as const) {
-    checkRating(value, label);
-  }
+/**
+ * A person rates the company on the O1 criteria (1–5 per dimension, 0–5 storytelling bonus).
+ * These are the only writes of the ratings: the pipeline never fills them.
+ */
+export function saveRatings(companyId: number, ratings: O1Ratings, decidedBy: string): void {
+  const { o1 } = loadTriageConfig();
+  for (const dimension of O1_DIMENSIONS) checkRating(ratings[dimension.key] ?? null, dimension.label, 1, o1.scale_max);
+  checkRating(ratings.storytelling_bonus ?? null, "Storytelling bonus", 0, o1.storytelling_bonus_max);
+  const values = ratingsOf(ratings);
   atomic(() => {
     const company = requireCompany(companyId);
-    const rated: Company = { ...company, thesis_fit: thesisFit, thesis_fit_confirmed: true, market, team };
-    repo.updateCompany(companyId, {
-      thesis_fit: thesisFit,
-      thesis_fit_confirmed: true,
-      market,
-      team,
-      ...rescore(rated),
-    });
+    const scored = rescore(values);
+    repo.updateCompany(companyId, { ...values, ...scored });
+    const summary = O1_DIMENSIONS.map((dimension) => `${dimension.label.toLowerCase()} ${values[dimension.key] ?? "-"}`);
     logDecision(
       company,
       "rating_changed",
       decidedBy,
       "",
-      `thesis fit ${thesisFit} (confirmed), market ${market || "-"}, team ${team || "-"}`,
+      `O1 ${pyFixed(scored.score, 1)} %: ${summary.join(", ")}, storytelling bonus ${values.storytelling_bonus ?? "-"}`,
     );
   });
 }
@@ -149,7 +137,6 @@ function requirePendingSuggestion(suggestionId: number): MergeSuggestion {
 
 /** Fold ``candidate`` into ``company``: move its touchpoints, then delete it. */
 export function approveMerge(suggestionId: number, decidedBy: string): void {
-  const config = loadTriageConfig();
   atomic(() => {
     const suggestion = requirePendingSuggestion(suggestionId);
     const company = requireCompany(suggestion.company_id);
@@ -164,27 +151,19 @@ export function approveMerge(suggestionId: number, decidedBy: string): void {
     );
     repo.moveTouchpoints(candidate.id, company.id);
     const touchpoints = repo.touchpointsOf(company.id);
-    const merged: Company = {
-      ...company,
+    // A person's ratings are kept: where the surviving company is unrated, the merged one's count.
+    const kept = ratingsOf(company);
+    const theirs = ratingsOf(candidate);
+    for (const key of [...O1_KEYS, STORYTELLING] as const) kept[key] = kept[key] ?? theirs[key];
+    repo.updateCompany(company.id, {
       touchpoint_count: touchpoints.length,
       first_seen_at: touchpoints.reduce(
         (first, touchpoint) => (touchpoint.received_at < first ? touchpoint.received_at : first),
         touchpoints[0].received_at,
       ),
-      source_quality: sourceQualityFromChannels(
-        touchpoints.map((touchpoint) => touchpoint.channel),
-        config.source_quality,
-      ),
-      momentum: Math.max(company.momentum, candidate.momentum),
       website_domain: company.website_domain || candidate.website_domain,
-    };
-    repo.updateCompany(company.id, {
-      touchpoint_count: merged.touchpoint_count,
-      first_seen_at: merged.first_seen_at,
-      source_quality: merged.source_quality,
-      momentum: merged.momentum,
-      website_domain: merged.website_domain,
-      ...rescore(merged),
+      ...kept,
+      ...rescore(kept),
     });
     // Cascades to the candidate's other merge suggestions; its decisions and messages keep its name.
     repo.deleteCompany(candidate.id);

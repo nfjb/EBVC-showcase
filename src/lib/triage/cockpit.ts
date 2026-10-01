@@ -6,7 +6,7 @@
 import { loadTriageConfig, responsiblePartners, teamRoles } from "./config";
 import { pyGet } from "./py";
 import type { CompanyWithTouchpoints } from "./types";
-import { QUADRANTS, quadrant, rankByPriority, type CockpitLine, type QuadrantKey } from "./urgency";
+import { QUADRANTS, quadrant, rankByPriority, RATE_TASK, type CockpitLine, type QuadrantKey } from "./urgency";
 import { ESCALATED } from "./workingDays";
 
 export type Line = CockpitLine<CompanyWithTouchpoints>;
@@ -32,7 +32,7 @@ export function tileFilters<L extends CockpitLine>(lines: L[]): Record<TileKey, 
     top: rankByPriority(openPassing).slice(0, config.worklist_size),
     new: rankByPriority(
       openPassing.filter(
-        (line) => line.days_in_queue <= newDays && line.tasks.includes("Rate thesis, market and team"),
+        (line) => line.days_in_queue <= newDays && line.tasks.includes(RATE_TASK),
       ),
     ),
     intros: rankByPriority(lines.filter((line) => line.intro_state !== null)),

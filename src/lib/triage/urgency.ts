@@ -1,7 +1,7 @@
 /**
  * Urgency, cockpit priority, open tasks and the next action for a company.
  *
- * priority = score % × urgency. Urgency comes only from obligations and news (an open warm
+ * priority = O1 score % × urgency. Urgency comes only from obligations and news (an open warm
  * intro's reply-deadline stage, how recent the latest signal is) and never from days in
  * queue: waiting longer only raises the 14/21-day flag (user decision 2026-09-30).
  */
@@ -9,7 +9,7 @@
 import { demoToday, loadTriageConfig } from "./config";
 import { daysBetween, shortWeekday, type IsoDate } from "./dates";
 import { compareCodePoints, pyGet, pyRound } from "./py";
-import { DECISION_REQUIRED, queueFlag } from "./scoring";
+import { DECISION_REQUIRED, O1_KEYS, queueFlag } from "./scoring";
 import { ESCALATED, introReplyState, REMINDER_TO_OWNER, type IntroReplyState } from "./workingDays";
 
 type IntroFields = { channel: string; intro_status: string; received_at: IsoDate; introducer_type: string };
@@ -24,20 +24,16 @@ export interface LineCompany<T extends IntroFields = IntroFields> {
   rank_override: number | null;
   status: string;
   passed_hard_filters: boolean;
-  thesis_fit_confirmed: boolean;
-  market: number | null;
-  team: number | null;
   touchpoints: T[];
 }
 
-export function maximumScore(): number {
-  const weights = loadTriageConfig().weights;
-  return Object.values(weights).reduce((sum, weight) => sum + Number(weight) * 3, 0);
+/** The cockpit's whole-number score % (the stored O1 score is already a percentage). */
+export function scorePercent(score: number): number {
+  return pyRound(score);
 }
 
-export function scorePercent(score: number): number {
-  return pyRound((100 * score) / maximumScore());
-}
+/** The open task while any O1 dimension is still unrated. */
+export const RATE_TASK = "Rate the O1 criteria";
 
 /** The company's open warm intro (the most recent one), or null. */
 export function openIntro<T extends IntroFields>(company: { touchpoints: T[] }): T | null {
@@ -90,8 +86,10 @@ export interface CockpitLine<C extends LineCompany = LineCompany> {
   urgent: boolean;
 }
 
-export function needsRating(company: Pick<LineCompany, "thesis_fit_confirmed" | "market" | "team">): boolean {
-  return !company.thesis_fit_confirmed || company.market === null || company.team === null;
+/** True while a person has not yet rated every O1 dimension (the storytelling bonus is optional). */
+export function needsRating(company: object): boolean {
+  const ratings = company as Record<string, unknown>;
+  return O1_KEYS.some((key) => ratings[key] === null || ratings[key] === undefined);
 }
 
 const INTRODUCER_SHORT_LABELS: Record<string, string> = { LP: "LP", portfolio_founder: "Portfolio", angel: "Angel" };
@@ -138,7 +136,7 @@ export function buildLine<C extends LineCompany>(
   if (company.status === "open" && !company.passed_hard_filters) {
     if (!passReplySentIds.has(company.id)) line.tasks.push("Approve pass draft");
   } else if (company.status === "open" && needsRating(company)) {
-    line.tasks.push("Rate thesis, market and team");
+    line.tasks.push(RATE_TASK);
   }
   if (company.status === "open" && company.passed_hard_filters && flag) line.tasks.push(flag);
 
@@ -154,7 +152,7 @@ export function buildLine<C extends LineCompany>(
       line.urgent = true;
     } else if (flag) {
       line.next_action = "Decide this week";
-    } else if (line.tasks.includes("Rate thesis, market and team")) {
+    } else if (line.tasks.includes(RATE_TASK)) {
       line.next_action = "Rate the deal";
     } else if (company.status === "open") {
       line.next_action = "Decide: advance or pass";
@@ -165,7 +163,11 @@ export function buildLine<C extends LineCompany>(
   return line;
 }
 
-/** Highest score % × urgency first; ranks pinned by a person keep their position. */
+/**
+ * Highest score % × urgency first, then score, then urgency (so deals nobody has rated yet,
+ * all at 0 %, still come in order of what is most pressing); ranks pinned by a person keep
+ * their position.
+ */
 export function rankByPriority<L extends CockpitLine>(lines: L[]): L[] {
   const pinned = lines
     .filter((line) => line.company.rank_override)
@@ -176,6 +178,7 @@ export function rankByPriority<L extends CockpitLine>(lines: L[]): L[] {
       (a, b) =>
         b.priority - a.priority ||
         b.score_percent - a.score_percent ||
+        b.urgency - a.urgency ||
         compareCodePoints(a.company.name, b.company.name),
     );
   for (const line of pinned) {

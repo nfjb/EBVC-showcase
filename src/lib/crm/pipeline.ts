@@ -8,7 +8,7 @@ import signalsDemo from "../../../demo/signals.csv?raw";
 
 import { atomic } from "@/lib/db/connection";
 import * as repo from "@/lib/db/repository";
-import { loadThesisKeywords, loadTriageConfig } from "@/lib/triage/config";
+import { loadTriageConfig } from "@/lib/triage/config";
 import { planPipeline } from "@/lib/triage/pipeline";
 
 export interface PipelineCounts {
@@ -26,7 +26,7 @@ export interface PipelineCounts {
  * Bulk loads write no Decision rows: the audit log is for people's clicks.
  */
 export function runPipeline(inboundText: string, signalsText: string): PipelineCounts {
-  const plan = planPipeline(inboundText, signalsText, loadTriageConfig(), loadThesisKeywords());
+  const plan = planPipeline(inboundText, signalsText, loadTriageConfig());
 
   const counts = atomic(() => {
     repo.clearCrm();

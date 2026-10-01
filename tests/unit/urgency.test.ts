@@ -32,9 +32,6 @@ function company(
     rank_override: null,
     status: "open",
     passed_hard_filters: true,
-    thesis_fit_confirmed: true,
-    market: 2,
-    team: 2,
     touchpoints: intros,
     ...fields,
   };
@@ -111,6 +108,23 @@ describe("urgency and priority", () => {
       "Urgent",
       "Calm",
     ]);
+  });
+
+  it("orders deals nobody has rated (all 0 %) by urgency", () => {
+    const calm = buildLine(company("Calm", { score: 0 }), TODAY);
+    const overdue = buildLine(company("Overdue", { score: 0, intros: [intro("2026-09-21")] }), TODAY);
+    const signal = buildLine(company("Signal", { score: 0, latest_signal_at: "2026-09-25" }), TODAY);
+    expect(rankByPriority([calm, signal, overdue]).map((line) => line.company.name)).toEqual([
+      "Overdue",
+      "Signal",
+      "Calm",
+    ]);
+  });
+
+  it("asks for the O1 rating while any dimension is unrated", () => {
+    const line = buildLine(company("Unrated", { score: 0 }), TODAY);
+    expect(line.tasks).toContain("Rate the O1 criteria");
+    expect(line.next_action).toBe("Rate the deal");
   });
 
   it("places matrix quadrants at the configured splits", () => {

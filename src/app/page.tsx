@@ -38,6 +38,7 @@ import {
 import { demoToday, loadTriageConfig, teamNames } from "@/lib/triage/config";
 import { dayMonth, daysBetween, longDateWithYear, type IsoDate } from "@/lib/triage/dates";
 import { CHANNEL_LABELS, label, PASS_CODE_LABELS } from "@/lib/triage/labels";
+import { ratedCount } from "@/lib/triage/scoring";
 import { cn } from "@/lib/utils";
 
 const VIEW_SLUGS: Record<string, View> = { my: "My view", team: "Team view", pipeline: "Pipeline", hot: "Hot topics" };
@@ -191,7 +192,7 @@ function WorkList({
         })}
       </div>
 
-      <ListHead title={`${title} · score × urgency`} />
+      <ListHead title={`${title} · O1 score × urgency`} />
       {!selected.length ? (
         <p className="flex items-center gap-2">
           <CircleCheck className="size-4 text-success-foreground" aria-hidden="true" /> Nothing here right now.
@@ -280,7 +281,7 @@ function PriorityTable({ lines, actionable, currentHref }: { lines: Line[]; acti
           <TableHead className={RANK}>#</TableHead>
           <TableHead>Company</TableHead>
           <TableHead>Description</TableHead>
-          <TableHead className={NUM}>Score</TableHead>
+          <TableHead className={NUM}>O1 %</TableHead>
           <TableHead className={NUM}>Urgency</TableHead>
           <TableHead>Open tasks</TableHead>
           <TableHead>{actionable ? "Next action" : "Assigned to · next step"}</TableHead>
@@ -326,7 +327,15 @@ function PriorityTable({ lines, actionable, currentHref }: { lines: Line[]; acti
                   </small>
                 </div>
               </TableCell>
-              <TableCell className={cn(NUM, "text-base")}>{line.score_percent}</TableCell>
+              <TableCell className={cn(NUM, "text-base")}>
+                {ratedCount(company) ? (
+                  line.score_percent
+                ) : (
+                  <span className="text-muted-foreground" title="No O1 rating yet">
+                    –<span className="sr-only">not rated</span>
+                  </span>
+                )}
+              </TableCell>
               <TableCell className={cn(NUM, "text-base", line.urgency >= 80 && "font-bold text-hot")}>
                 {line.urgency}
               </TableCell>

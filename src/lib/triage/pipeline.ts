@@ -7,14 +7,14 @@
  * for the weekly freshness re-check, which is not part of the MVP.
  */
 
-import type { ThesisKeywords, TriageConfig } from "./config";
+import type { TriageConfig } from "./config";
 import { readCsv, type CsvRow } from "./csv";
 import { monthYear, parseIsoDate, type IsoDate } from "./dates";
 import { findSuggestedMerges, groupRecords, type SuggestedMerge } from "./dedup";
 import { hardFilterPassCode } from "./filters";
 import { normaliseDomain } from "./normalise";
 import { pyToInt } from "./py";
-import { momentumFromSignals, scoreCompany, sourceQualityFromChannels, suggestThesisFit } from "./scoring";
+import { emptyRatings, scoreCompany } from "./scoring";
 import type { Company, Touchpoint } from "./types";
 
 export const INBOUND_REQUIRED_COLUMNS = ["record_id", "channel", "received_at", "company_name"];
@@ -63,7 +63,6 @@ export function buildCompanyFields(
   records: CsvRow[],
   knownSignals: CsvRow[],
   config: TriageConfig,
-  keywords: ThesisKeywords,
 ): CompanyFields {
   const first = earliest(records);
   const stage = latestValue(records, "stage");
@@ -71,20 +70,9 @@ export function buildCompanyFields(
   const roundSizeEur = pyToInt(latestValue(records, "round_size_eur"));
   const deckText = latestValue(records, "deck_text");
   const passCode = hardFilterPassCode(stage, country, roundSizeEur, config.hard_filters);
-  const components = {
-    thesis_fit: suggestThesisFit(deckText, keywords),
-    market: null,
-    team: null,
-    momentum: momentumFromSignals(
-      knownSignals.map((signal) => signal.signal_type),
-      config.momentum_cap,
-    ),
-    source_quality: sourceQualityFromChannels(
-      records.map((record) => record.channel),
-      config.source_quality,
-    ),
-  };
-  const [score, breakdown] = scoreCompany(components, config.weights);
+  // Every O1 dimension is a person's rating: a new company starts unrated, at 0 %.
+  const ratings = emptyRatings();
+  const [score, breakdown] = scoreCompany(ratings, config.o1);
   const latestSignal = knownSignals.reduce<CsvRow | null>(
     (latest, signal) => (latest === null || signal.event_date > latest.event_date ? signal : latest),
     null,
@@ -104,12 +92,7 @@ export function buildCompanyFields(
     status: "open",
     passed_hard_filters: passCode === "",
     pass_code: passCode,
-    thesis_fit: components.thesis_fit,
-    thesis_fit_confirmed: false,
-    market: null,
-    team: null,
-    momentum: components.momentum,
-    source_quality: components.source_quality,
+    ...ratings,
     score,
     score_breakdown: JSON.stringify(breakdown),
     latest_signal: latestSignal ? describeSignal(latestSignal) : "",
@@ -148,7 +131,6 @@ export function planPipeline(
   inboundText: string,
   signalsText: string,
   config: TriageConfig,
-  keywords: ThesisKeywords,
 ): PipelinePlan {
   const records = readCsv(inboundText, INBOUND_REQUIRED_COLUMNS, "Inbound CSV");
   const signals = signalsByDomain(readCsv(signalsText, SIGNALS_REQUIRED_COLUMNS, "Signals CSV"));
@@ -166,7 +148,7 @@ export function planPipeline(
       (signals.get(domain) ?? []).filter((signal) => signal.event_date <= lastArrival),
     );
     return {
-      fields: buildCompanyFields(rows, knownSignals, config, keywords),
+      fields: buildCompanyFields(rows, knownSignals, config),
       touchpoints: rows.map(touchpointFields),
     };
   });

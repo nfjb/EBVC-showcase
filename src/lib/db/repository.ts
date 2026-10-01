@@ -37,14 +37,12 @@ function toCompany(row: Row): Company {
   return {
     ...(row as unknown as Company),
     passed_hard_filters: Boolean(row.passed_hard_filters),
-    thesis_fit_confirmed: Boolean(row.thesis_fit_confirmed),
   };
 }
 
 function companyParams(fields: Partial<CompanyFields>): Row {
   const params: Row = { ...fields };
   if ("passed_hard_filters" in fields) params.passed_hard_filters = fields.passed_hard_filters ? 1 : 0;
-  if ("thesis_fit_confirmed" in fields) params.thesis_fit_confirmed = fields.thesis_fit_confirmed ? 1 : 0;
   return params;
 }
 

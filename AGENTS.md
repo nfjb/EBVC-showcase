@@ -22,8 +22,10 @@ an in-memory store in the tab (`src/lib/db/connection.ts`), nothing is persisted
 
 1. **Time in queue never changes score, urgency or priority.** It only raises the 14/21-day
    flags. Tests enforce this.
-2. **Companies are scored, never founders.** `team` and `market` are only ever set by a
-   person (`saveRatings`). The pipeline never fills them.
+2. **Companies are scored, never founders.** The score is the O1 Venture investment
+   criteria (`src/lib/triage/scoring.ts`, weights and bands in `config/weights.yaml`). All
+   ten O1 ratings and the storytelling bonus are only ever set by a person (`saveRatings`);
+   the pipeline never fills them, so a new company scores 0 % until someone rates it.
 3. **Every human action writes a Decision row in the same transaction** (`atomic`). If the
    row cannot be written, nothing is saved. The pipeline writes no Decisions.
 4. **Fuzzy name matches are only suggestions.** Nothing merges without a person approving.

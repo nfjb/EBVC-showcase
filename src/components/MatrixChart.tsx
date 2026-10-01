@@ -69,7 +69,8 @@ export function MatrixChart({
   const router = useRouter();
   const [hovered, setHovered] = useState<MatrixRow | null>(null);
 
-  const xMax = Math.max(60, Math.max(...rows.map((row) => row["Score %"])) + 8);
+  // The O1 score is a percentage: the axis always runs 0–100 so positions compare across views.
+  const xMax = 104;
   const sx = (value: number) => MARGIN.left + (value / xMax) * PLOT_W;
   const sy = (value: number) => MARGIN.top + PLOT_H - ((value - Y_DOMAIN[0]) / (Y_DOMAIN[1] - Y_DOMAIN[0])) * PLOT_H;
   const { score_split: scoreSplit, urgency_split: urgencySplit } = splits;
@@ -92,7 +93,7 @@ export function MatrixChart({
   const legendY = HEIGHT - 40;
   return (
     <div className="relative rounded-lg border bg-card p-2">
-      <svg className="block h-auto w-full" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Priority matrix: score % against urgency">
+      <svg className="block h-auto w-full" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Priority matrix: O1 score % against urgency">
         {bands.map((band) => (
           <rect
             key={band.fill}
@@ -126,7 +127,7 @@ export function MatrixChart({
         <line x1={MARGIN.left} x2={MARGIN.left + PLOT_W} y1={MARGIN.top + PLOT_H} y2={MARGIN.top + PLOT_H} stroke="#c9c3ba" />
         <line x1={MARGIN.left} x2={MARGIN.left} y1={MARGIN.top} y2={MARGIN.top + PLOT_H} stroke="#c9c3ba" />
         <text x={MARGIN.left + PLOT_W / 2} y={MARGIN.top + PLOT_H + 38} textAnchor="middle" fontSize={13} fontWeight={700} fill={INK}>
-          Score % (fit)
+          O1 score %
         </text>
         <text
           transform={`translate(${MARGIN.left - 40},${MARGIN.top + PLOT_H / 2}) rotate(-90)`}

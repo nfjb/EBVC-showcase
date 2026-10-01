@@ -20,6 +20,7 @@ import {
   setIntroStatus,
 } from "@/lib/crm/triageActions";
 import { ActionRefused } from "@/lib/triage/errors";
+import { emptyRatings, O1_KEYS } from "@/lib/triage/scoring";
 import { OUTSIDE_GEOGRAPHY, OUTSIDE_STAGE, TICKET_MISMATCH } from "@/lib/triage/filters";
 
 import { count, demoTexts, getCompanyOrThrow, loadDemo, robotix } from "./helpers";
@@ -64,10 +65,11 @@ describe("pipeline", () => {
     expect(repo.listCompanies().filter((company) => company.passed_hard_filters && company.pass_code)).toEqual([]);
   });
 
-  it("never rates team or market and writes no decisions", () => {
-    expect(count("company", (row) => row.team !== null)).toBe(0);
-    expect(count("company", (row) => row.market !== null)).toBe(0);
-    expect(count("company", (row) => Boolean(row.thesis_fit_confirmed))).toBe(0);
+  it("never fills an O1 rating and writes no decisions", () => {
+    for (const key of [...O1_KEYS, "storytelling_bonus"]) {
+      expect(count("company", (row) => row[key] !== null)).toBe(0);
+    }
+    expect(count("company", (row) => row.score !== 0)).toBe(0);
     expect(count("decision")).toBe(0);
   });
 
@@ -128,19 +130,31 @@ describe("human actions", () => {
     expect(count("decision", (row) => row.decision === "rank_override")).toBe(1);
   });
 
-  it("rescores and logs human ratings", () => {
-    const before = robotix().score;
-    saveRatings(robotix().id, 3, 3, 2, PERSON);
+  it("rescores and logs human O1 ratings", () => {
+    expect(robotix().score).toBe(0);
+    const ratings = { ...emptyRatings(), team: 5, market: 4, problem_solution_fit: 3 };
+    saveRatings(robotix().id, ratings, PERSON);
     const company = robotix();
-    expect(company.score).toBeGreaterThan(before);
-    expect(company.thesis_fit_confirmed).toBe(true);
-    expect(company.team).toBe(2);
-    expect(count("decision", (row) => row.decision === "rating_changed")).toBe(1);
+    expect(company.score).toBe(41); // 20 + 12 + 9
+    expect(company.team).toBe(5);
+    expect(company.exit_potential).toBeNull();
+    const [decision] = repo.listDecisions();
+    expect(decision.decision).toBe("rating_changed");
+    expect(decision.comment).toMatch(/^O1 41\.0 %: team 5, market opportunity 4, problem–solution fit 3, /);
+  });
+
+  it("refuses ratings outside 1–5 (bonus 0–5) and saves nothing", () => {
+    const before = robotix();
+    expect(() => saveRatings(before.id, { ...emptyRatings(), team: 6 }, PERSON)).toThrow(ActionRefused);
+    expect(() => saveRatings(before.id, { ...emptyRatings(), market: 0 }, PERSON)).toThrow(ActionRefused);
+    expect(() => saveRatings(before.id, { ...emptyRatings(), storytelling_bonus: 6 }, PERSON)).toThrow(ActionRefused);
+    expect(robotix()).toEqual(before);
+    expect(count("decision")).toBe(0);
   });
 
   it("saves nothing when the decision cannot be logged", () => {
     const before = robotix();
-    expect(() => saveRatings(before.id, 3, 3, 2, "")).toThrow(ActionRefused);
+    expect(() => saveRatings(before.id, { ...emptyRatings(), team: 3 }, "")).toThrow(ActionRefused);
     expect(robotix()).toEqual(before);
   });
 

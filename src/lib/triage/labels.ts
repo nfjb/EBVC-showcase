@@ -69,9 +69,3 @@ export function introUrgency(introStatus: string, state: IntroReplyState): strin
   if (state.escalation === REMINDER_TO_OWNER) return `⏰ Due ${longDate(state.deadline)}, reminder sent to owner`;
   return `◻ Due ${longDate(state.deadline)}`;
 }
-
-/** ``"thesis_fit"`` → ``"Thesis fit"`` (``str.replace("_", " ").capitalize()``). */
-export function componentLabel(component: string): string {
-  const spaced = component.replaceAll("_", " ");
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
-}

@@ -19,7 +19,6 @@ import { compareCodePoints, pyFixed } from "@/lib/triage/py";
 import { loadTriageConfig } from "@/lib/triage/config";
 import {
   CHANNEL_LABELS,
-  componentLabel,
   DECISION_LABELS,
   euros,
   INTRO_LABELS,
@@ -27,11 +26,14 @@ import {
   PASS_CODE_LABELS,
   rating,
 } from "@/lib/triage/labels";
-import type { BreakdownRow } from "@/lib/triage/scoring";
-import { queueFlag } from "@/lib/triage/scoring";
-import { maximumScore } from "@/lib/triage/urgency";
+import { O1_DIMENSIONS, queueFlag, ratedCount, ratingsOf, scoreBand, type BreakdownRow } from "@/lib/triage/scoring";
 
 import { EmptyCrm } from "../EmptyCrm";
+
+const DIMENSION_LABELS: Record<string, string> = {
+  ...Object.fromEntries(O1_DIMENSIONS.map((dimension) => [dimension.key, dimension.label])),
+  storytelling_bonus: "Storytelling & design",
+};
 
 export default function DealDetailPage() {
   useCrm();
@@ -74,7 +76,7 @@ export default function DealDetailPage() {
       <Metrics>
         <Metric label="Decision" value={label(DECISION_LABELS, company.status)} />
         <RankMetric />
-        <Metric label="Score" value={`${pyFixed(company.score, 1)} / ${pyFixed(maximumScore(), 0)}`} />
+        <Metric label="O1 score" value={`${pyFixed(company.score, 1)} %`} />
         <Metric label="Days in queue" value={waiting} />
         <Metric label="Touchpoints" value={company.touchpoint_count} />
       </Metrics>
@@ -93,6 +95,10 @@ export default function DealDetailPage() {
           </span>
         </Notice>
       ) : null}
+      <p className="text-sm">
+        <span className="text-muted-foreground">O1 assessment:</span>{" "}
+        <strong>{scoreBand(company.score, ratedCount(company), loadTriageConfig().o1)}</strong>
+      </p>
       {company.latest_signal ? <Caption>Latest signal: {company.latest_signal}</Caption> : null}
 
       <Tabs labels={["Decide", "Score breakdown", `History (${company.touchpoint_count})`, "Rank override"]}>
@@ -101,10 +107,7 @@ export default function DealDetailPage() {
             companyId: company.id,
             status: company.status,
             statusLabel: label(DECISION_LABELS, company.status),
-            thesisFit: company.thesis_fit,
-            thesisFitConfirmed: company.thesis_fit_confirmed,
-            market: company.market,
-            team: company.team,
+            ratings: ratingsOf(company),
             pass: passDialogData(company),
             introReply:
               latestIntro && latestIntro.intro_status === "open" ? introReplyDialogData(latestIntro, company) : null,
@@ -118,27 +121,37 @@ export default function DealDetailPage() {
             <DataTable>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Component</TableHead>
-                  <TableHead className={NUM}>Value</TableHead>
+                  <TableHead>O1 dimension</TableHead>
+                  <TableHead className={NUM}>Rating</TableHead>
                   <TableHead className={NUM}>Weight</TableHead>
-                  <TableHead className={NUM}>Points</TableHead>
+                  <TableHead className={NUM}>Points (%)</TableHead>
                   <TableHead>Note</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {breakdown.map((row) => (
                   <TableRow key={row.component}>
-                    <TableCell>{componentLabel(row.component)}</TableCell>
+                    <TableCell>{DIMENSION_LABELS[row.component] ?? row.component}</TableCell>
                     <TableCell className={NUM}>{rating(row.value)}</TableCell>
-                    <TableCell className={NUM}>{pyFixed(row.weight, 1)}</TableCell>
+                    <TableCell className={NUM}>{row.weight ? `${row.weight} %` : "bonus"}</TableCell>
                     <TableCell className={NUM}>{pyFixed(row.points, 1)}</TableCell>
                     <TableCell className="whitespace-normal">{row.note}</TableCell>
                   </TableRow>
                 ))}
+                <TableRow className="font-semibold hover:bg-transparent">
+                  <TableCell>O1 score</TableCell>
+                  <TableCell />
+                  <TableCell className={NUM}>100 %</TableCell>
+                  <TableCell className={NUM}>{pyFixed(company.score, 1)}</TableCell>
+                  <TableCell className="whitespace-normal">Capped at 100 %</TableCell>
+                </TableRow>
               </TableBody>
             </DataTable>
           ) : null}
-          <Caption>Time in queue is not a score component. Team and market are rated by people only.</Caption>
+          <Caption>
+            Points = weight × rating / {loadTriageConfig().o1.scale_max}. Every rating is a person&apos;s; unrated dimensions
+            add nothing. Time in queue is not part of the score.
+          </Caption>
         </div>
 
         <DataTable>

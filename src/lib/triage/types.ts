@@ -25,12 +25,20 @@ export interface Company {
   passed_hard_filters: boolean;
   /** Hard-filter failure or the pass code a person chose when passing the deal. */
   pass_code: string;
-  thesis_fit: number | null;
-  thesis_fit_confirmed: boolean;
-  market: number | null;
+  // The O1 ratings, 1–5 each, set only by a person (null until rated).
   team: number | null;
-  momentum: number;
-  source_quality: number;
+  market: number | null;
+  problem_solution_fit: number | null;
+  technology_product: number | null;
+  business_model: number | null;
+  traction_validation: number | null;
+  competition: number | null;
+  go_to_market: number | null;
+  financials: number | null;
+  exit_potential: number | null;
+  /** Storytelling & design: 0–5 bonus points on top of the score. */
+  storytelling_bonus: number | null;
+  /** The O1 score in % (0–100). */
   score: number;
   /** JSON list of {component, value, weight, points, note}. */
   score_breakdown: string;

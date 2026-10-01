@@ -1,23 +1,18 @@
 /**
- * Loads ``config/weights.yaml``, ``config/team.yaml`` and the thesis keywords from
- * ``config/thesis.md``. The files are bundled into the app at build time (``?raw``), so the
+ * Loads ``config/weights.yaml`` and ``config/team.yaml``. The files are bundled into the app at build time (``?raw``), so the
  * rules run in the browser; restart the dev server after editing them.
  */
 
 import YAML from "yaml";
 
 import teamText from "../../../config/team.yaml?raw";
-import thesisText from "../../../config/thesis.md?raw";
 import weightsText from "../../../config/weights.yaml?raw";
 
 import { parseIsoDate, type IsoDate } from "./dates";
-import { pyStrip } from "./py";
 
 export interface TriageConfig {
   demo_today: IsoDate;
-  weights: Record<string, number>;
-  source_quality: Record<string, number>;
-  momentum_cap: number;
+  o1: O1Rules;
   hard_filters: HardFilterRules;
   queue_flags: { decide_this_week_days: number; decision_required_days: number };
   intro_reply_working_days: number;
@@ -38,6 +33,14 @@ export interface TriageConfig {
   matrix: { score_split: number; urgency_split: number };
 }
 
+/** The O1 Venture investment criteria: weights in %, bands highest first. */
+export interface O1Rules {
+  scale_max: number;
+  weights: Record<string, number>;
+  storytelling_bonus_max: number;
+  bands: { min: number; label: string }[];
+}
+
 export interface HardFilterRules {
   stages: string[];
   countries: Record<string, string[]>;
@@ -53,15 +56,12 @@ export interface TeamMember {
   responsible_partner: string;
 }
 
-export type ThesisKeywords = Record<"strong" | "partial" | "outside", string[]>;
-
 function parseYaml(text: string): unknown {
   // YAML 1.1, as PyYAML reads it: an unquoted 2026-09-30 is a date.
   return YAML.parse(text, { version: "1.1" });
 }
 
 let triageConfig: TriageConfig | null = null;
-let thesisKeywords: ThesisKeywords | null = null;
 let team: TeamMember[] | null = null;
 
 export function loadTriageConfig(): TriageConfig {
@@ -78,21 +78,6 @@ export function loadTriageConfig(): TriageConfig {
 /** The demo's fixed "today" (config/weights.yaml → demo_today). */
 export function demoToday(): IsoDate {
   return loadTriageConfig().demo_today;
-}
-
-/** The ``strong`` / ``partial`` / ``outside`` keyword lists from thesis.md. */
-export function loadThesisKeywords(): ThesisKeywords {
-  if (thesisKeywords === null) {
-    const text = thesisText;
-    const keywords = {} as ThesisKeywords;
-    for (const level of ["strong", "partial", "outside"] as const) {
-      const match = new RegExp(`^\\s*${level}:\\s*(.+)$`, "m").exec(text);
-      const words = match ? match[1].split(",") : [];
-      keywords[level] = words.map((word) => pyStrip(word).toLowerCase()).filter((word) => word);
-    }
-    thesisKeywords = keywords;
-  }
-  return thesisKeywords;
 }
 
 export function loadTeam(): TeamMember[] {

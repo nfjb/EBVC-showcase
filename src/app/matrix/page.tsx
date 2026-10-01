@@ -49,8 +49,8 @@ export default function MatrixPage() {
       <Eyebrow>Score × urgency</Eyebrow>
       <Display>Priority matrix</Display>
       <Lede>
-        Every open deal that passed the hard filters, placed by fit and urgency. Time in queue is not part of either
-        axis.
+        Every open deal that passed the hard filters, placed by O1 score and urgency. Deals nobody has rated yet sit
+        at 0 %. Time in queue is not part of either axis.
       </Lede>
       <NavigateSelect
         label="Deals owned by"
@@ -148,7 +148,7 @@ function MatrixBody({
         <TableHeader>
           <TableRow>
             <TableHead>Company</TableHead>
-            <TableHead className={NUM}>Score</TableHead>
+            <TableHead className={NUM}>O1 %</TableHead>
             <TableHead className={NUM}>Urgency</TableHead>
             <TableHead className={NUM}>Touch­points</TableHead>
             <TableHead>Source</TableHead>
