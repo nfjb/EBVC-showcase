@@ -4,6 +4,7 @@
 
 import {
   ArrowRightLeft,
+  BookOpen,
   Compass,
   Database,
   Gauge,
@@ -51,6 +52,7 @@ const ICONS: Record<string, LucideIcon> = {
   "/merges": ArrowRightLeft,
   "/outbox": Send,
   "/audit": ReceiptText,
+  "/scoring": BookOpen,
   "/uploads": Upload,
 };
 

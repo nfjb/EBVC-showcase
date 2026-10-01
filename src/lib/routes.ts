@@ -8,6 +8,7 @@ export const PAGES = [
   { name: "Merge queue", href: "/merges" },
   { name: "Outbox", href: "/outbox" },
   { name: "Audit log", href: "/audit" },
+  { name: "How scores work", href: "/scoring" },
 ] as const;
 
 /** The records behind the app, as the Lex admin listed them in the sidebar. */

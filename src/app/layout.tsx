@@ -33,14 +33,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <TooltipProvider>
           <SidebarProvider>
             <AppSidebar />
-            <SidebarInset>
+            <SidebarInset className="min-w-0">
               <AppHeader />
-              <main id="main" className="mx-auto w-full max-w-[1400px] min-w-0 px-4 py-6 lg:px-8 print:p-0">
+              <div id="main" className="mx-auto w-full max-w-[1400px] min-w-0 px-4 py-6 lg:px-8 print:p-0">
                 <BrowserOnly>
                   <AgentStatusBar />
                   {children}
                 </BrowserOnly>
-              </main>
+              </div>
             </SidebarInset>
           </SidebarProvider>
           <Toaster position="top-right" />

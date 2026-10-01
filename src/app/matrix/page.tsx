@@ -13,7 +13,20 @@ import type { CSSProperties } from "react";
 import { NavigateSelect } from "@/components/CockpitClient";
 import { RememberDealList } from "@/components/dealList";
 import { HeaderActions } from "@/components/HeaderActions";
-import { UrgencyHeader, UrgencyValue } from "@/components/UrgencyScore";
+import {
+  ariaSort,
+  ImportanceHeader,
+  ImportanceValue,
+  nextSort,
+  readSort,
+  sortByScore,
+  TotalHeader,
+  TotalValue,
+  UrgencyHeader,
+  UrgencyValue,
+  type SortColumn,
+  type SortState,
+} from "@/components/ScoreTooltips";
 import { Caption, DataTable, Notice, NUM, PageHeader } from "@/components/page";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -73,7 +86,14 @@ export default function MatrixPage() {
       {!rows.length ? (
         <Notice tone="info">No open deals for this owner.</Notice>
       ) : (
-        <MatrixBody rows={rows} lines={lines} selected={selected} ownerParam={ownerParam} currentHref={currentHref} />
+        <MatrixBody
+          rows={rows}
+          lines={lines}
+          selected={selected}
+          ownerParam={ownerParam}
+          currentHref={currentHref}
+          sort={readSort(params)}
+        />
       )}
     </>
   );
@@ -85,15 +105,29 @@ function MatrixBody({
   selected,
   ownerParam,
   currentHref,
+  sort,
 }: {
   rows: ReturnType<typeof matrixRows>;
   lines: ReturnType<typeof cockpitLines>;
   selected: QuadrantKey | null;
   ownerParam: string | null;
   currentHref: string;
+  sort: SortState;
 }) {
-  const shown = byPriorityThenScore(selected ? rows.filter((row) => row.quadrant_key === selected) : rows);
+  const shown = sortByScore(
+    byPriorityThenScore(selected ? rows.filter((row) => row.quadrant_key === selected) : rows),
+    sort,
+    (row) => ({ importance: row["Score %"], urgency: row.Urgency, total: row.Priority }),
+  );
+  const sortHref = (column: SortColumn) =>
+    withQuery("/matrix", { owner: ownerParam, q: selected, ...nextSort(sort, column) });
+  const orderNote = !sort.column
+    ? "highest priority first"
+    : `by ${{ importance: "Importance Score", urgency: "Urgency Score", total: "Total Score" }[sort.column]}, ${
+        sort.direction === "asc" ? "lowest" : "highest"
+      } first`;
   const title = selected ? QUADRANTS[selected][0] : "All deals on the matrix";
+  const companies = new Map(lines.map((line) => [line.company.id, line.company]));
   // Label the six highest-priority deals that have a score; unrated ones all sit on the 0 % line.
   const topIds = rankByPriority(lines.filter((line) => ratedCount(line.company)))
     .slice(0, 12)
@@ -147,15 +181,22 @@ function MatrixBody({
       <RememberDealList title={`Matrix: ${title}`} ids={shown.map((row) => row.company_id)} />
       <div className="mt-8 mb-3 flex flex-wrap items-baseline justify-between gap-3">
         <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
-        <span className="text-sm text-muted-foreground">{shown.length} deals · highest priority first</span>
+        <span className="text-sm text-muted-foreground">
+          {shown.length} deals · {orderNote}
+        </span>
       </div>
       <DataTable>
         <TableHeader>
           <TableRow>
             <TableHead>Company</TableHead>
-            <TableHead className={NUM}>Importance Score</TableHead>
-            <TableHead className={NUM}>
-              <UrgencyHeader />
+            <TableHead className={NUM} aria-sort={ariaSort(sort, "importance")}>
+              <ImportanceHeader sort={sort} sortHref={sortHref("importance")} />
+            </TableHead>
+            <TableHead className={NUM} aria-sort={ariaSort(sort, "urgency")}>
+              <UrgencyHeader sort={sort} sortHref={sortHref("urgency")} />
+            </TableHead>
+            <TableHead className={NUM} aria-sort={ariaSort(sort, "total")}>
+              <TotalHeader sort={sort} sortHref={sortHref("total")} />
             </TableHead>
             <TableHead className={NUM}>Touch­points</TableHead>
             <TableHead>Source</TableHead>
@@ -173,9 +214,14 @@ function MatrixBody({
                   {row.Company}
                 </Link>
               </TableCell>
-              <TableCell className={NUM}>{row["Score %"]}</TableCell>
+              <TableCell className={NUM}>
+                <ImportanceValue company={companies.get(row.company_id) ?? {}} />
+              </TableCell>
               <TableCell className={NUM}>
                 <UrgencyValue value={row.Urgency} reason={row.urgency_reason} />
+              </TableCell>
+              <TableCell className={NUM}>
+                <TotalValue importance={row["Score %"]} urgency={row.Urgency} total={row.Priority} />
               </TableCell>
               <TableCell className={NUM}>{row.Touchpoints}</TableCell>
               <TableCell>{row.Source}</TableCell>

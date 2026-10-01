@@ -17,7 +17,20 @@ import { useRouter } from "next/navigation";
 import { ExportControls, NavigateSelect, NextActionPill, type PillAction } from "@/components/CockpitClient";
 import { RememberDealList } from "@/components/dealList";
 import { HeaderActions } from "@/components/HeaderActions";
-import { UrgencyHeader, UrgencyValue } from "@/components/UrgencyScore";
+import {
+  ariaSort,
+  ImportanceHeader,
+  ImportanceValue,
+  nextSort,
+  readSort,
+  sortByScore,
+  TotalHeader,
+  TotalValue,
+  UrgencyHeader,
+  UrgencyValue,
+  type SortColumn,
+  type SortState,
+} from "@/components/ScoreTooltips";
 import { Caption, DataTable, Metric, Metrics, NUM, PageHeader } from "@/components/page";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,7 +57,6 @@ import {
 import { demoToday, loadTriageConfig, teamNames } from "@/lib/triage/config";
 import { dayMonth, daysBetween, longDateWithYear, type IsoDate } from "@/lib/triage/dates";
 import { CHANNEL_LABELS, label, PASS_CODE_LABELS } from "@/lib/triage/labels";
-import { ratedCount } from "@/lib/triage/scoring";
 import { cn } from "@/lib/utils";
 
 import { EmptyCrm } from "./deals/EmptyCrm";
@@ -75,7 +87,15 @@ export default function CockpitPage() {
   const router = useRouter();
   const today = demoToday();
   const lines = cockpitLines(today);
-  const state: Changes = { view: SLUG_FOR_VIEW[view], tile, owner: one(params.owner) || null, all: showAll ? "1" : null };
+  const sort = readSort(params);
+  const state: Changes = {
+    view: SLUG_FOR_VIEW[view],
+    tile,
+    owner: one(params.owner) || null,
+    all: showAll ? "1" : null,
+    sort: sort.column,
+    dir: sort.column ? sort.direction : null,
+  };
   const href = (changes: Changes) => withQuery("/", { ...state, ...changes });
   const currentHref = href({});
 
@@ -120,6 +140,7 @@ export default function CockpitPage() {
             today={today}
             href={href}
             currentHref={currentHref}
+            sort={sort}
           />
         )}
       </div>
@@ -137,6 +158,7 @@ function WorkList({
   today,
   href,
   currentHref,
+  sort,
 }: {
   lines: Line[];
   view: View;
@@ -147,11 +169,20 @@ function WorkList({
   today: IsoDate;
   href: (changes: Changes) => string;
   currentHref: string;
+  sort: SortState;
 }) {
   const router = useRouter();
   const filters = tileFilters(lines);
   const title = tileLabel(tile, view);
-  const selected = filters[tile];
+  // The worklist's own order (priority, with pinned ranks) gives each deal its rank; a
+  // sort by a score column only changes the order shown.
+  const ranked = filters[tile];
+  const rankOf = new Map(ranked.map((line, index) => [line.company.id, index + 1]));
+  const selected = sortByScore(ranked, sort, (line) => ({
+    importance: line.company.score,
+    urgency: line.urgency,
+    total: line.priority,
+  }));
   // My view: act directly. Team view: see who owns each step, so it can be chased.
   const actionable = view === "My view";
   return (
@@ -210,6 +241,9 @@ function WorkList({
             lines={showAll ? selected : selected.slice(0, PAGE_SIZE)}
             actionable={actionable}
             currentHref={currentHref}
+            rankOf={rankOf}
+            sort={sort}
+            sortHref={(column) => href(nextSort(sort, column))}
           />
           {selected.length > PAGE_SIZE ? (
             <div className="print:hidden">
@@ -231,7 +265,7 @@ function WorkList({
       <ExportControls
         fileName={`skarv-${title.toLowerCase().replaceAll(" ", "-")}-${today}.csv`}
         rows={selected.map((line, index) => ({
-          Rank: index + 1,
+          Rank: rankOf.get(line.company.id) ?? index + 1,
           Company: line.company.name,
           Website: line.company.website_domain,
           Description: line.company.one_liner,
@@ -239,6 +273,7 @@ function WorkList({
           Country: line.company.country,
           "Importance Score": line.score_percent,
           "Urgency Score": line.urgency,
+          "Total Score": line.priority,
           "Open tasks": line.tasks.join("; "),
           "Next action": line.next_action,
           "Days in queue": line.days_in_queue,
@@ -280,7 +315,22 @@ function Assignee({ line }: { line: Line }) {
   );
 }
 
-function PriorityTable({ lines, actionable, currentHref }: { lines: Line[]; actionable: boolean; currentHref: string }) {
+function PriorityTable({
+  lines,
+  actionable,
+  currentHref,
+  rankOf,
+  sort,
+  sortHref,
+}: {
+  lines: Line[];
+  actionable: boolean;
+  currentHref: string;
+  /** Each deal's rank on the worklist, whatever the shown order. */
+  rankOf: Map<number, number>;
+  sort: SortState;
+  sortHref: (column: SortColumn) => string;
+}) {
   return (
     <CockpitTable>
       <TableHeader>
@@ -288,9 +338,14 @@ function PriorityTable({ lines, actionable, currentHref }: { lines: Line[]; acti
           <TableHead className={RANK}>#</TableHead>
           <TableHead>Company</TableHead>
           <TableHead>Description</TableHead>
-          <TableHead className={NUM}>Importance Score</TableHead>
-          <TableHead className={NUM}>
-            <UrgencyHeader />
+          <TableHead className={NUM} aria-sort={ariaSort(sort, "importance")}>
+            <ImportanceHeader sort={sort} sortHref={sortHref("importance")} />
+          </TableHead>
+          <TableHead className={NUM} aria-sort={ariaSort(sort, "urgency")}>
+            <UrgencyHeader sort={sort} sortHref={sortHref("urgency")} />
+          </TableHead>
+          <TableHead className={NUM} aria-sort={ariaSort(sort, "total")}>
+            <TotalHeader sort={sort} sortHref={sortHref("total")} />
           </TableHead>
           <TableHead>Open tasks</TableHead>
           <TableHead>{actionable ? "Next action" : "Assigned to · next step"}</TableHead>
@@ -306,12 +361,15 @@ function PriorityTable({ lines, actionable, currentHref }: { lines: Line[]; acti
           return (
             <TableRow key={company.id}>
               <TableCell className={RANK}>
-                {index + 1}
+                {rankOf.get(company.id) ?? index + 1}
                 {company.rank_override ? (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span tabIndex={0} className="ml-1 inline-flex">
-                        <Pin className="size-3.5 text-primary" aria-label={`Pinned: ${company.rank_override_comment}`} />
+                        <Pin
+                          className="size-3.5 text-primary"
+                          aria-label={`Pinned: ${company.rank_override_comment}`}
+                        />
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>Pinned: {company.rank_override_comment}</TooltipContent>
@@ -342,16 +400,13 @@ function PriorityTable({ lines, actionable, currentHref }: { lines: Line[]; acti
                 </div>
               </TableCell>
               <TableCell className={cn(NUM, "text-base")}>
-                {ratedCount(company) ? (
-                  line.score_percent
-                ) : (
-                  <span className="text-muted-foreground" title="No Fathom rating yet">
-                    –<span className="sr-only">not rated</span>
-                  </span>
-                )}
+                <ImportanceValue company={company} />
               </TableCell>
               <TableCell className={cn(NUM, "text-base")}>
                 <UrgencyValue value={line.urgency} reason={line.urgency_reason} hot={line.urgency >= 80} />
+              </TableCell>
+              <TableCell className={cn(NUM, "text-base")}>
+                <TotalValue importance={line.score_percent} urgency={line.urgency} total={line.priority} />
               </TableCell>
               <TableCell className="text-center">
                 <Tooltip>
@@ -404,7 +459,9 @@ function valueCounts(values: string[]): [string, number][] {
 function PipelineView({ lines }: { lines: Line[] }) {
   const passed = lines.filter((line) => line.company.passed_hard_filters);
   const failures = valueCounts(
-    lines.filter((line) => !line.company.passed_hard_filters).map((line) => label(PASS_CODE_LABELS, line.company.pass_code)),
+    lines
+      .filter((line) => !line.company.passed_hard_filters)
+      .map((line) => label(PASS_CODE_LABELS, line.company.pass_code)),
   );
   const channels = valueCounts(repo.listTouchpoints().map((touchpoint) => label(CHANNEL_LABELS, touchpoint.channel)));
   return (
@@ -433,7 +490,15 @@ function PipelineView({ lines }: { lines: Line[] }) {
   );
 }
 
-function CountTable({ heading, countHeading, rows }: { heading: string; countHeading: string; rows: [string, number][] }) {
+function CountTable({
+  heading,
+  countHeading,
+  rows,
+}: {
+  heading: string;
+  countHeading: string;
+  rows: [string, number][];
+}) {
   return (
     <Table>
       <TableHeader>

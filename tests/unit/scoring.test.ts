@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import { loadTriageConfig } from "@/lib/triage/config";
+import { DIMENSION_GUIDE, SCALE_GUIDE } from "@/lib/triage/fathomGuide";
 import { pyRound } from "@/lib/triage/py";
 import {
   DECIDE_THIS_WEEK,
@@ -104,5 +105,14 @@ describe("Fathom scoring", () => {
   it("refuses weights that do not add up to 100", () => {
     const broken = { ...Fathom, weights: { ...Fathom.weights, team: 25 } };
     expect(() => scoreCompany(rated(3), broken)).toThrow(/add up to 105/);
+  });
+
+  it("explains every dimension and every point of the scale on the How scores work page", () => {
+    expect(Object.keys(DIMENSION_GUIDE).sort()).toEqual([...FATHOM_KEYS].sort());
+    for (const guide of Object.values(DIMENSION_GUIDE)) {
+      expect(guide.positive.length).toBeGreaterThan(0);
+      expect(guide.negative.length).toBeGreaterThan(0);
+    }
+    expect(SCALE_GUIDE.map((point) => point.value)).toEqual([1, 2, 3, 4, 5]);
   });
 });
